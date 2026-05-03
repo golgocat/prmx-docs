@@ -1,0 +1,118 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "PRMX V4",
+  "colors": {
+    "primary": "#0EA5E9",
+    "light": "#38BDF8",
+    "dark": "#0369A1"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Start here",
+            "pages": [
+              "docs/INDEX"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "docs/guidelines/TEST-PRINCIPLE",
+              "docs/guidelines/UI-DESIGN-PRINCIPLES",
+              "docs/operations/RESTART-GUIDE",
+              "docs/operations/ORACLE-WORKERS"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Architecture",
+        "groups": [
+          {
+            "group": "System overview",
+            "pages": [
+              "docs/architecture/V4-ARCHITECTURE",
+              "docs/architecture/V4-ORACLE-ARCHITECTURE",
+              "docs/architecture/CAPITAL-INVARIANTS",
+              "docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK",
+              "docs/architecture/PRMX-V4-V5-PRODUCT-SPLIT"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "docs/architecture/DEFI-OPERATIONAL-PATTERNS"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Cross-chain",
+        "groups": [
+          {
+            "group": "Cross-chain transport",
+            "pages": [
+              "docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision",
+              "docs/hyperlane-migration/m73-exit-dispatcher-design",
+              "docs/hyperlane-migration/m75-ica-yield-command-bus",
+              "docs/hyperlane-migration/m76-yield-report-hyperlane-transport",
+              "docs/hyperlane-migration/m78-prmx-evm-user-actions-design"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Product",
+        "groups": [
+          {
+            "group": "Product",
+            "pages": [
+              "docs/product/V4-APP-DESIGN",
+              "docs/product/V4-PRODUCT-CATALOG",
+              "docs/product/PRODUCT-LINEUP",
+              "docs/product/RAINGUARD-PRODUCT-SPEC",
+              "docs/product/OPEN-METEO-EVENT-EXPANSION"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "Issues",
+        "href": "https://linear.app/southernbreeze/team/SBP"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "GitHub",
+      "href": "https://github.com/satorubito/PRMX"
+    }
+  },
+  "search": {
+    "prompt": "Ask the PRMX V4 docs"
+  },
+  "seo": {
+    "metatags": {
+      "og:site_name": "PRMX V4 Documentation",
+      "og:description": "Engineer-facing architecture and design documentation for PRMX V4 — a Substrate-based parametric weather insurance platform."
+    },
+    "indexing": "navigable"
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/satorubito/PRMX"
+    }
+  }
+}
