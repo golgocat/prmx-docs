@@ -12,12 +12,12 @@ PRMX will split into two product lines and repositories:
 | PRMX V4 | `PRMX-v4-defi` | Fully Decentralized DeFi Version | Continue the current working V4 architecture: user-held balances, policy-level LP mechanics, orderbook-oriented DeFi UX, Hyperlane-backed settlement. |
 | PRMX V5 | `PRMX-v5-regulated` | Regulated / Bermuda SAC Version | New regulated architecture: SAC is the risk-taking entity, funds are held in SAC-scoped accounts, users hold positions/claims, and exits are same-SAC-only. |
 
-Local workspace convention:
+Workspace convention:
 
-| Product line | Local path |
+| Product line | Repository |
 |---|---|
-| PRMX V4 | `/Users/satorubito/Codes/PRMX4` |
-| PRMX V5 | `/Users/satorubito/Codes/PRMX5` |
+| PRMX V4 | `PRMX4` (this codebase) |
+| PRMX V5 | `PRMX5` (separate repository) |
 
 V5 is not a small feature branch on V4. It changes the ownership model for capital, the transfer model for user funds, the reserve model on Base, and the audit story. It should be developed from a V4 completion baseline in a separate GitHub repository.
 
@@ -176,7 +176,7 @@ The pilot must prove:
 
 1. Complete and label the current repository state as `PRMX-v4-defi`.
 2. Clone from the V4 completion baseline into the GitHub repository `PRMX-v5-regulated`.
-3. Use `/Users/satorubito/Codes/PRMX4` for local V4 work and `/Users/satorubito/Codes/PRMX5` for local V5 work.
+3. Keep V4 work in the `PRMX4` repository and V5 work in the `PRMX5` repository as separate workspaces.
 4. Move Bermuda SAC implementation work to V5 only.
 5. Keep V4 roadmap and V5 roadmap separate in Linear.
 
