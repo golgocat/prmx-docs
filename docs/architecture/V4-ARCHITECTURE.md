@@ -436,7 +436,6 @@ Vault yield tracking ensures PRMX `pallet-assets(1)` accounting follows Base Pol
 - [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS) — SSoT rules and the three-tier backing model
 - [Oracle Architecture](/docs/architecture/V4-ORACLE-ARCHITECTURE) — weather + capital + financial oracle roles
 - [Parametric Insurance Rulebook](/docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK) — peril taxonomy and settlement rules
-- [DeFi Operational Patterns](/docs/architecture/DEFI-OPERATIONAL-PATTERNS) — Hyperlane / vault operations
 
 **Product**
 

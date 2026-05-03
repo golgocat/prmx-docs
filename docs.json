@@ -41,12 +41,6 @@
               "docs/architecture/CAPITAL-INVARIANTS",
               "docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK"
             ]
-          },
-          {
-            "group": "Reference",
-            "pages": [
-              "docs/architecture/DEFI-OPERATIONAL-PATTERNS"
-            ]
           }
         ]
       },

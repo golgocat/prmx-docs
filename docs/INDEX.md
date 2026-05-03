@@ -69,10 +69,9 @@ Read these when working on the relevant area, not as part of onboarding:
 
 | Document | When to read |
 |----------|-------------|
-| [DeFi Operational Patterns](/docs/architecture/DEFI-OPERATIONAL-PATTERNS) | When designing or modifying Hyperlane Warp Route operations (rebalancer, MovableCollateralRouter patterns, optional XERC20 considerations). |
 | [Test Principles](/docs/guidelines/TEST-PRINCIPLE) | Before adding tests; the principles for what to assert and what to mock. |
 | [UI Design Principles](/docs/guidelines/UI-DESIGN-PRINCIPLES) | When building or editing frontend components (terminal-dark visual system). |
-| [Restart Guide](/docs/operations/RESTART-GUIDE) | When you need to restart the local or DO-hosted environment. |
+| [Restart Guide](/docs/operations/RESTART-GUIDE) | When recovering local development services or interpreting service-restart effects on the public testnet. |
 | [Oracle Workers](/docs/operations/ORACLE-WORKERS) | When debugging an oracle-service worker (capital, rebalancer, vault-reporter, Morpho). |
 
 ---

@@ -12,7 +12,7 @@ The canonical zero-start runbook for fresh chain bring-up lives in the source re
 | Local dev — chain data survives restarts | `--persistent` |
 | After a `git pull` or pallet change | `--build` |
 | Runtime upgrade only (no data wipe) | `node scripts/council-runtime-upgrade.mjs <wasm>` |
-| Cloud (DO) restart | See [Cloud Deployment](#cloud-deployment-public-access) |
+| Public testnet endpoints (read-only reader) | See [Public Testnet](#public-testnet-interacting-from-outside) |
 | Stuck Hyperlane message | See [Troubleshooting](#troubleshooting) |
 
 > **Settlement note**: oracle finality ≠ payout finality. A policy can sit in `pending settlement` while PRMX prepares local liquidity. Restart and incident procedures must check both oracle health and capital/liquidity readiness.
@@ -40,7 +40,7 @@ You need `INGEST_HMAC_SECRET` for OCW ingest auth. No AccuWeather key required.
 6. [What Happens When You Restart](#what-happens-when-you-restart)
 7. [Secret Security](#secret-security)
 8. [Services Overview](#services-overview)
-9. [Cloud Deployment (Public Access)](#cloud-deployment-public-access)
+9. [Public Testnet (interacting from outside)](#public-testnet-interacting-from-outside)
 10. [Troubleshooting](#troubleshooting)
 
 ---
@@ -210,15 +210,15 @@ For forkless upgrades, use persistent chain data and preserve chain continuity.
 cargo build --release -p prmx-node
 
 # 2) Restart node with persistent base-path
-sudo systemctl restart prmx-node
+#    (project-managed hosts use the equivalent service-restart command)
+./scripts/restart-dev-environment.sh --persistent
 
 # 3) Confirm node is healthy and producing blocks
 curl -s -X POST -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","method":"system_health","params":[],"id":1}' \
   http://127.0.0.1:9944
 
-# 4) Then restart oracle
-sudo systemctl restart prmx-oracle
+# 4) Then restart oracle (or its managed service equivalent)
 ```
 
 ### Prohibited During Forkless Upgrade
@@ -286,9 +286,9 @@ INGEST_HMAC_SECRET                 set-oracle-secrets.mjs    ocw:v4:ingest_hmac_
 | Environment | Secret Storage |
 |-------------|---------------|
 | Local dev | `.env` file in project root |
-| Cloud (DigitalOcean) | `/etc/prmx/secrets.env` |
+| Project-managed hosts | OS-level secret store (path is operator-internal) |
 | Supabase | Vercel env vars / oracle service env |
-| Pricing API key | GCP Secret Manager |
+| Pricing API key | Cloud secret manager |
 
 ---
 
@@ -306,9 +306,9 @@ INGEST_HMAC_SECRET                 set-oracle-secrets.mjs    ocw:v4:ingest_hmac_
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Supabase | https://nemdpvzcqpwascovsudf.supabase.co | PostgreSQL database |
-| Pricing API | https://pricing-api-pm6goneopq-as.a.run.app | Pricing API |
-| Open-Meteo | https://api.open-meteo.com | Weather data (free) |
+| Supabase | `https://<project-ref>.supabase.co` | PostgreSQL database (project URL injected from secrets) |
+| Pricing API | Internal Cloud Run endpoint | Premium / payout pricing (auth required) |
+| Open-Meteo | https://api.open-meteo.com | Weather data (free, no key) |
 
 ### DAO Auto-Underwrite
 
@@ -330,45 +330,25 @@ DAO_EVENT_TYPE_WHITELIST=PrecipSumGte,Precip1hGte,Precip12hMaxGte,TempMaxGte,Tem
 DAO_PREMIUM_TOLERANCE=0.01
 DAO_MAX_SHARES_PER_REQUEST=1000
 DAO_SHARE_PERCENT=0.5
-PRICING_API_URL=https://pricing-api-pm6goneopq-as.a.run.app
-PRICING_API_KEY=your_api_key
+PRICING_API_URL=<pricing-api-url>
+PRICING_API_KEY=<pricing-api-key>
 ```
 
 ---
 
-## Cloud Deployment (Public Access)
+## Public Testnet (interacting from outside)
 
-### DigitalOcean VM
+Readers of this guide are expected to **interact with** the shared PRMX testnet rather than deploy their own. The infra topology below is informational only — host details, SSH access, and systemd service control are restricted to project operators.
 
-- **IP**: 159.223.218.107
-- **SSH**: `ssh -i ~/.ssh/id_ed25519 root@159.223.218.107`
-- **Repo**: `/opt/PRMX`
-- **Secrets**: `/etc/prmx/secrets.env`
+| Surface | Endpoint | Reader use |
+|---|---|---|
+| Frontend | `https://prmx-v4.vercel.app` | Connect a wallet, run a policy lifecycle |
+| Substrate WS | Published in the frontend's runtime config | Read chain state via Polkadot.js / RPC |
+| REST API | Published in the frontend's runtime config | Read off-chain timeline / reports |
 
-### Public Endpoints (via nginx)
+The Substrate node, oracle service, and reverse proxy run on a project-controlled host fronted by a Vercel-managed app. Restart and credential rotation are operator tasks; they do not affect external readers beyond brief endpoint downtime.
 
-| Endpoint | URL |
-|----------|-----|
-| WebSocket | `wss://159-223-218-107.nip.io/ws` |
-| REST API | `https://159-223-218-107.nip.io` |
-| Frontend | `https://prmx-v4.vercel.app` |
-
-### Systemd Services
-
-```bash
-sudo systemctl status prmx-node prmx-oracle nginx
-sudo systemctl restart prmx-node    # Wait until node is healthy/producing blocks
-sudo systemctl restart prmx-oracle
-```
-
-### SSH Tunnel (for admin endpoints)
-
-```bash
-ssh -i ~/.ssh/id_ed25519 \
-    -L 9944:localhost:9944 \
-    -L 3001:localhost:3001 \
-    root@159.223.218.107
-```
+If the public endpoints are unreachable, check the [PRMX status page or Linear](https://linear.app/southernbreeze/team/SBP) before assuming a code-side failure on your end.
 
 ---
 
@@ -379,13 +359,10 @@ ssh -i ~/.ssh/id_ed25519 \
 If observations/timeline counters suddenly drop after restart, check oracle startup logs first:
 
 ```bash
-# Local
 rg -n "Chain restart detected|Clearing all tables" /tmp/oracle-service.log
-
-# Cloud
-sudo journalctl -u prmx-oracle --since "2 hours ago" --no-pager | \
-  rg -n "Chain restart detected|Clearing all tables"
 ```
+
+(On project-managed hosts the equivalent is `journalctl -u prmx-oracle`.)
 
 If these messages appear during a forkless upgrade, treat it as an operational incident:
 
@@ -396,10 +373,8 @@ If these messages appear during a forkless upgrade, treat it as an operational i
 ### OCW Auth Verification Failed
 
 ```bash
-# Re-inject HMAC secret
+# Re-inject HMAC secret (load from your local secret store, then run)
 cd scripts
-set -a; source /etc/prmx/secrets.env; set +a  # Cloud
-# or: source .env                              # Local
 node set-oracle-secrets.mjs \
     --hmac-secret "$INGEST_HMAC_SECRET"
 
@@ -443,11 +418,7 @@ grep DAO oracle-service/.env
 
 ### Pricing API Unavailable
 
-```bash
-curl https://pricing-api-pm6goneopq-as.a.run.app/health/ready
-```
-
-If down, DAO will reject all requests (no silent fallback). Check Cloud Run logs in GCP Console.
+If the Pricing API is unreachable, the DAO underwriter rejects all requests (no silent fallback). Verify the configured `PRICING_API_URL` and that the project-issued key is still valid; if reachability is broken from a project-managed host, escalate to ops.
 
 ### Port Already in Use
 
@@ -455,16 +426,6 @@ If down, DAO will reject all requests (no silent fallback). Check Cloud Run logs
 lsof -ti:9944 | xargs kill -9   # Node
 lsof -ti:3001 | xargs kill -9   # Oracle
 lsof -ti:3000 | xargs kill -9   # Frontend
-```
-
-### Nginx Issues (Cloud)
-
-```bash
-sudo systemctl status nginx
-sudo nginx -t
-sudo systemctl restart nginx
-sudo certbot certificates           # Check SSL
-sudo certbot renew --force-renewal  # Renew SSL
 ```
 
 ---

@@ -10,7 +10,7 @@
 | Catalog entries | 638,352 |
 | Reanalysis source | 31-year ERA5 |
 | Catalog endpoint | `GET /v4/catalog/info/live` |
-| API base | `https://neuralgcm-pricing-api-pm6goneopq-as.a.run.app` |
+| API base | Project-issued Cloud Run URL (auth required) |
 
 ---
 
