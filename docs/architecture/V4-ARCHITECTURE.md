@@ -54,69 +54,62 @@ Hyperlane Warp Route (HypERC20Collateral on Base)
 
 ```mermaid
 flowchart TB
-  user[User / LP / Operator] --> fe[Frontend - Next.js on Vercel]
-  fe <--> rpc[Chain RPC - WS]
-  fe <--> osApi[Oracle Service API - HTTP]
-  fe <--> pricingApi[Pricing API]
+  user["User / LP / Operator"]
 
-  subgraph Chain["PRMX Chain (Substrate runtime + Frontier EVM)"]
-    ocw["OCW: pallet-oracle-v4"]
-    pallets["Runtime pallets: market-v4 / policy-v4 / oracle-v4 / orderbook-lp-v4 / markets / holdings / account-link / warp-account / equity-sale / revenue-share / dao-council / governance-upgrade / assets"]
+  subgraph Clients["Clients"]
+    fe["Frontend<br/>(Next.js / Vercel)"]
+    mcp["MCP Server<br/>(21 tools)"]
   end
 
-  subgraph OracleSvc["Offchain Oracle Service (Node.js/TS)"]
-    listener["Chain listener (finalized blocks)"]
-    dao["DAO auto-underwrite"]
-    crossval["Cross-validator (ERA5 + NASA POWER)"]
-    capital["Capital watcher (deposit / exit / settlement / vault creation)"]
-    rebalancer["Rebalancer monitor / decision / ICA executor"]
-    vaultReporter["Vault reporter (Hyperlane yield transport)"]
-    morphoOps["Morpho borrower / vault migration / live NAV probe"]
-    dbLayer["DB layer (Supabase)"]
+  subgraph PRMX["PRMX Chain<br/>(Substrate + Frontier EVM)"]
+    rpc["Chain RPC (WS)"]
+    pallets["Runtime pallets<br/>policy-v4 / market-v4 / oracle-v4<br/>warp-account / assets(1) / orderbook-lp-v4<br/>dao-council / governance-upgrade"]
+    ocw["OCW (pallet-oracle-v4)"]
   end
 
-  subgraph MCP["MCP Server (Vercel)"]
-    mcpTools["21 tools: read / build_unsigned / submit_signed"]
+  subgraph Oracle["Oracle Service (Node.js)"]
+    osApi["HTTP API"]
+    workers["Workers<br/>capital · rebalancer · vault-reporter<br/>DAO underwrite · cross-validator"]
   end
 
-  subgraph DB["Database"]
-    supa[(Supabase / PostgreSQL)]
+  subgraph Bridge["Hyperlane Warp Route"]
+    relay["Validators + Relayer"]
   end
 
-  subgraph External["External services"]
-    om[Open-Meteo API]
-    era5[ERA5-Land via Open-Meteo Historical]
-    nasa[NASA POWER MERRA-2]
-    ngcm[Pricing API]
+  subgraph Base["EVM (Base Sepolia)"]
+    evm["HypERC20Collateral<br/>PolicyVaultManager · VaultFactory<br/>PolicyVault · YieldReporter"]
   end
 
+  subgraph Ext["External Services"]
+    pricing["Pricing API"]
+    om["Open-Meteo"]
+    era5["ERA5-Land"]
+    nasa["NASA POWER"]
+  end
+
+  supa[("Supabase / PostgreSQL")]
+
+  user --> fe
+  user --> mcp
+  fe --> rpc
+  fe --> osApi
+  fe --> pricing
+  mcp --> rpc
+  mcp --> osApi
+
+  rpc <--> pallets
+  ocw --> pallets
   ocw --> om
-  dao --> ngcm
-  crossval --> era5
-  crossval --> nasa
 
-  listener <--> rpc
-  dao <--> rpc
+  workers <--> rpc
+  workers <--> evm
+  workers --> pricing
+  workers --> era5
+  workers --> nasa
+  workers --> supa
+  osApi --> workers
 
-  capital <--> evm
-  rebalancer <--> evm
-  vaultReporter <--> evm
-
-  OracleSvc --> dbLayer
-  dbLayer --> supa
-
-  mcpTools <--> osApi
-  mcpTools <--> rpc
-
-  subgraph EVM["EVM Chains (Base Sepolia default)"]
-    evm["HypERC20Collateral / PolicyVaultManager / VaultFactory / PolicyVault / YieldReporter"]
-  end
-
-  subgraph Bridge["Hyperlane"]
-    relay["Hyperlane Warp Route (validators + relayer)"]
-  end
-
-  Chain <--> relay
+  pallets <--> relay
   relay <--> evm
 ```
 
