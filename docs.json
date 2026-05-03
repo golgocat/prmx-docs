@@ -97,7 +97,7 @@
     "primary": {
       "type": "button",
       "label": "GitHub",
-      "href": "https://github.com/satorubito/PRMX"
+      "href": "https://github.com/golgocat/prmx-docs"
     }
   },
   "search": {
@@ -112,7 +112,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/satorubito/PRMX"
+      "github": "https://github.com/golgocat/prmx-docs"
     }
   }
 }
