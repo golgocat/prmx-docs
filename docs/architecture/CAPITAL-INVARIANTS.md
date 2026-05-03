@@ -1,35 +1,40 @@
 # Capital Invariants: PRMX mUSDC / Base EVM USDC Parity
 
-> **Values that must converge**: PRMX mUSDC supply (S, `pallet-assets(1)` SSoT),
-> bridge-net counter (B), Base collateral (C), PolicyVault assets (PV),
-> EVM vault totalManagedAssets (V).
->
-> Perfect real-time equality is structurally impossible in a cross-chain system — deposit relay latency,
-> settlement-to-exit gaps, and yield reporter polling intervals create transient divergence.
-> The correct approach is **invariant tiering**: hard rules that must never break, and soft rules
-> with bounded convergence windows.
+> **What this is**: the hard rules that govern the PRMX↔Base capital seam, plus the soft drift bounds the system tolerates while cross-chain deliveries are in flight.
 
-> **Canonical capital path**: PRMX↔Base Sepolia via Hyperlane Warp Route, with
-> `pallet-assets(1)` as the settlement-balance source of truth and Hyperlane
-> traversal in both directions.
-> Inbound: Base collateral lock → Hyperlane → PRMX EVM recipient/facade/precompile →
-> `pallet-assets::mint`. Outbound: pallet exit extrinsic → PRMX EVM dispatch surface
-> validated against `warpAccount.pendingExits` through the `0x0801` precompile →
-> Hyperlane → Base collateral release. Any oracle-attested mint path, direct PRMX EVM synthetic
-> exit path, or non-Hyperlane deposit/exit path is outside the design.
+## TL;DR
 
-## Definitions
+Perfect real-time equality is structurally impossible in a cross-chain system. The correct approach is **invariant tiering**:
 
-| Symbol | Source | Description |
-|--------|--------|-------------|
-| **S** | `api.query.assets.asset(1).supply` | Total mUSDC circulating on PRMX (`pallet-assets(1)` settlement-balance SSoT). Fresh genesis must not pre-allocate balances; testnet initial balances are created by Base MockUSDC mint + Hyperlane deposit. |
-| **B** | `api.query.warpAccount.bridgeMintedTotal` | Strict bridge-net counter: canonical Hyperlane bridge-in mints minus `finalize_exit` burns. Genesis allocations should be zero by design. |
-| **C** | `IERC20(USDC).balanceOf(HypERC20Collateral)` on Base | Idle USDC still sitting in the Hyperlane collateral router. Useful as a partial seam signal, but not the full route-backing picture once reserve has been deployed into PolicyVaults. |
-| **ST** | Settlement / exit bridge transient custody, when present | USDC held outside the collateral router and outside active PolicyVaults for settlement or exit processing. Normally small or zero in steady state. |
-| **PV** | Sum of all `PolicyVault.totalAssets()` | USDC held in individual policy vaults |
-| **EVM_total** | C + PV + ST | Total Base backing |
+| Tier | Invariant | Action on breach |
+|---|---|---|
+| **1. Bridge seam** | Every change to `bridgeMintedTotal` matches a canonical Hyperlane route effect | Investigate; recover only via governance-gated `reconcile_bridge_minted_down` |
+| **2. Backing** | `B ≈ EVM_total` (1:1 backing) | Halt mint paths; reconcile down to actual backing |
+| **3. Convergence** | `B − EVM_total` bounded and shrinking | `warn` at 10 USDC drift, `critical` at 100 USDC |
 
-`pallet-assets(1)` is the single bookkeeping authority on PRMX. Initial balances are created through Hyperlane delivery, so `S` and `B` start aligned for bridge-originated mints. `BridgeMintedTotal` is the narrow seam counter — it tracks only bridge-seam mints/burns, making it the correct operand for the "Base collateral backs the bridge" invariant.
+## Canonical capital path
+
+```
+Inbound:  Base HypERC20Collateral.lock → Hyperlane → PRMX EVM recipient
+                                       → 0x0800 precompile → pallet-assets(1).mint
+Outbound: pallet exit extrinsic → PRMX EVM dispatcher (validated via 0x0801)
+                                → Hyperlane → Base HypERC20Collateral.release
+```
+
+`pallet-assets(1)` is the settlement-balance SSoT. Any oracle-attested mint path, direct PRMX EVM synthetic exit path, or non-Hyperlane deposit/exit path is outside the design.
+
+## Symbols
+
+| Symbol | Source | Meaning |
+|---|---|---|
+| **S** | `api.query.assets.asset(1).supply` | Total mUSDC supply on PRMX (the SSoT) |
+| **B** | `warpAccount.bridgeMintedTotal` | Strict bridge-net counter: canonical mints minus `finalize_exit` burns |
+| **C** | `IERC20(USDC).balanceOf(HypERC20Collateral)` | Idle USDC in the Hyperlane collateral router |
+| **PV** | Σ `PolicyVault.totalAssets()` | USDC across all PolicyVaults |
+| **ST** | Settlement / exit transient custody | USDC held for in-flight settlement or exit |
+| **EVM_total** | `C + PV + ST` | Total Base-side backing |
+
+> `B` is the narrow seam counter — it tracks only bridge-seam mints/burns, making it the correct operand for "Base collateral backs the bridge."
 
 ## Tier 1: Bridge Seam Audit
 

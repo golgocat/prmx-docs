@@ -1,52 +1,71 @@
 # PRMX V4 Architecture (Rainguard)
 
-> **Scope**: End-to-end V4 system architecture (runtime, OCW, oracle service, pricing, frontend).
+> **Scope**: End-to-end V4 system architecture — runtime, OCW, oracle service, pricing, frontend.
 
 PRMX V4 is a Substrate-based parametric weather insurance system with a Rainguard-first UX and a multi-peril pricing catalog.
 
-Settlement model note:
+## At a glance
 
-- Oracle evaluation and capital settlement are now treated as separate phases.
-- After a policy becomes `Triggered` or `Matured`, PRMX may keep it in a temporary settlement-pending phase while local liquidity is prepared from the capital layer.
-- Frontend and operator tooling should treat payout or LP distribution as final only after settlement finalization, not merely after oracle finality.
+| Layer | Stack |
+|---|---|
+| Chain | Substrate runtime + Frontier EVM (PRMX) |
+| Counterparty chain | Base Sepolia (per-entity vaults, yield strategies) |
+| Cross-chain transport | Hyperlane Warp Route + ICA command bus |
+| Settlement asset | mUSDC on PRMX (`pallet-assets(1)`), backed 1:1 by USDC on Base |
+| Off-chain service | Node.js/TS oracle service (Supabase-backed) |
+| Frontend | Next.js on Vercel |
+| Pricing | Cloud Run API (ERA5 observed catalog) |
+| Database | Supabase / PostgreSQL |
 
-Current product layers:
+## Product surface
 
-- **On-chain event types**: 14 (`PrecipSumGte` .. `Pm25MaxGte`; 3 removed from enum: UvIndexMaxGte, SoilMoistureMinLte, VisibilityMinLte)
-- **Frontend purchasable products**: 14 (grouped by Rain Guard, Weather Gate, Climate Parametrics)
-- **Active pricing catalog products**: 14 (from `/v4/catalog/info/live`; UV/Soil Moisture/Visibility removed from active catalog)
-- **Product lines**: PRMX Rain Guard (3), PRMX Weather Gate (4), PRMX Climate Parametrics (7)
-- **Product spec source of truth**: `frontend/src/lib/product-specs.ts`
+- **14 active products** across 3 lines: Rain Guard (3), Weather Gate (4), Climate Parametrics (7)
+- **14 on-chain event types** (`PrecipSumGte` … `Pm25MaxGte`)
+- **Active catalog source**: `GET /v4/catalog/info/live`
+- **Spec source of truth**: `frontend/src/lib/product-specs.ts`
+
+## Settlement model
+
+Oracle evaluation and capital settlement are separate phases:
+
+- A policy becoming `Triggered` or `Matured` is an **oracle outcome**, not a finalized payout.
+- PRMX may hold the policy in a settlement-pending phase while local liquidity is prepared.
+- UI and operator tooling must treat payout/LP distribution as final only after settlement finalization.
 
 ## Capital topology
 
-- `PRMX`: standalone Substrate chain on DigitalOcean (`wss://159-223-218-107.nip.io/ws`)
-- `Counterparty chain`: Base Sepolia (sole EVM route — per-entity vaults, yield strategies)
-- `Settlement asset`: `USDC` (MockUSDC on testnets), represented on PRMX as `pallet-assets(1)` mUSDC
-- `Capital routing`: Hyperlane Warp Route + ICA command bus
-- `Pallets`: `pallet-assets(1)` is the settlement-balance SSoT, `warpAccount` tracks bridge-backed liability / pending exits, `prmxPolicyV4` owns policy settlement and vault accounting, and `pallet-prmx-policy-vault-reporter` applies Hyperlane-delivered vault reports
+| Surface | Role |
+|---|---|
+| PRMX chain | Settlement balance SSoT (`pallet-assets(1)` mUSDC), policy lifecycle, oracle |
+| Base Sepolia | Per-entity policy vaults, yield strategies, settlement reserve |
+| Hyperlane Warp Route | Token bridge — USDC ↔ mUSDC |
+| Hyperlane ICA | PRMX → Base command bus (vault ops, rebalance) |
+| Hyperlane yield-report | Base → PRMX vault state (`YieldReporter` → `0x0802`) |
 
 ### Per-Entity Vault Architecture
 
-On Base Sepolia, each policy gets its own `PolicyVault` created by `VaultFactory`:
+Each policy gets its own `PolicyVault` on Base, deployed by `VaultFactory`:
 
 ```
 Hyperlane Warp Route (HypERC20Collateral on Base)
   └── PolicyVaultManager
         ├── VaultFactory (emits VaultDeployed)
         ├── PolicyVault[N] (one per policy)
-        │     └── MorphoBlueStrategy (current Base Sepolia testnet strategy)
-        └── YieldReporter (Hyperlane vault reports to PRMX 0x0802)
+        │     └── MorphoBlueStrategy (Base Sepolia testnet strategy)
+        └── YieldReporter (Hyperlane vault reports → PRMX 0x0802)
 ```
 
-- **Deposit path**: User deposits USDC into Base `HypERC20Collateral`; Hyperlane delivery reaches PRMX and mints into `pallet-assets(1)`.
-- **Vault creation**: Automated by the capital watcher after policy acceptance. Base `VaultFactory.VaultDeployed` is used as the early discovery surface, while PRMX `record_vault_funded` confirms the canonical non-zero baseline.
-- **Vault baseline calibration**: `record_vault_funded` and `correct_initial_vault_assets` mark the vault baseline calibrated immediately. The first Hyperlane yield report must compute a real delta instead of being consumed as an implicit calibration cycle.
-- **Auto-investment**: Policy capital is allocated through `PolicyVaultManager` and, on the current generation, invested into `MorphoBlueStrategy`.
-- **Vault yield**: `vault-reporter` reads `PolicyVault.totalAssets`, separates principal/rebalance movement from yield, and reports through the trusted reporter-pallet path. The periodic route is Base `YieldReporter` -> Hyperlane -> PRMX `YieldReportRecipient` -> `0x0802` -> `pallet-prmx-policy-vault-reporter`.
-- **Settlement liquidity**: Both triggered and no-event settlements can require `PolicyVaultManager.returnSettlementCapital(...)` via ICA before PRMX finalization.
-- **Live NAV display**: `MORPHO_LIVE_NAV_PROBE_ENABLED` can populate `policy_live_nav` from Base RPC for UI freshness only. Settlement, pricing, DAO underwriting, backing, and mUSDC accounting continue to use Hyperlane-delivered PRMX state.
-- **Addresses**: See `evm/abi/deployments/shared-integration.chain-84532.offchain.env`
+| Phase | What happens |
+|---|---|
+| **Deposit** | User deposits USDC into `HypERC20Collateral`; Hyperlane mints mUSDC into `pallet-assets(1)` |
+| **Vault creation** | Capital watcher detects `VaultFactory.VaultDeployed`; PRMX `record_vault_funded` confirms baseline |
+| **Baseline calibration** | `record_vault_funded` / `correct_initial_vault_assets` mark calibrated; first yield report computes a real delta |
+| **Auto-investment** | `PolicyVaultManager` allocates capital into `MorphoBlueStrategy` |
+| **Yield reporting** | Base `YieldReporter` → Hyperlane → PRMX `YieldReportRecipient` → `0x0802` → reporter pallet |
+| **Settlement liquidity** | `PolicyVaultManager.returnSettlementCapital(...)` via ICA before PRMX finalization |
+| **UI freshness only** | Optional Base RPC NAV probe writes `policy_live_nav` (display only — never feeds accounting) |
+
+Contract addresses: `evm/abi/deployments/shared-integration.chain-84532.offchain.env`
 
 ---
 
@@ -119,22 +138,22 @@ flowchart TB
 
 ### Key modules
 
-- `prmxMarketV4`: request creation, fills, request status, cancel/expire requests
-- `prmxPolicyV4`: policy lifecycle, settlement request, settlement finalization, vault yield (credit/debit)
-- `prmxOracleV4`: oracle state, snapshots, final reports
-- `prmxOrderbookLpV4`: LP orderbook/trading for policy LP tokens
-- `prmxMarkets`: location registry (lat/lon source for OCW)
-- `prmxHoldings`: holdings and LP balance tracking
-- `prmxAccountLink`: PRMX account ↔ EVM wallet link intents and finalized mappings
-- `warpAccount`: Hyperlane bridge-backed liability, pending exits, and canonical exit finalization
-- `pallet-assets(1)`: canonical mUSDC settlement balance ledger
-- `pallet-prmx-policy-vault-reporter`: Hyperlane vault asset reports and rebalance acknowledgements
-- `prmxPolicyV4` (capital extensions): route-aware policy settlement, vault baseline, reserve-return, yield/loss, and DAO backstop accounting
-- `prmxEquitySale`: council-controlled PRMX token sale rounds (USDC → PRMX exchange)
-- `prmxRevenueShare`: O(1) accumulator for premium distribution to PRMX stakers
-- `daoCouncil`: pallet-collective instance for governance (majority voting)
-- `assets`: settlement asset accounting (asset id `1`, mUSDC)
-- `governanceUpgrade`: council-authorized runtime upgrades (authorize hash → apply WASM)
+| Group | Pallet | Responsibility |
+|---|---|---|
+| **Policy lifecycle** | `prmxMarketV4` | Request creation, fills, status, cancel/expire |
+| | `prmxPolicyV4` | Policy lifecycle, settlement, vault yield/loss accounting, DAO backstop |
+| | `prmxOrderbookLpV4` | LP orderbook for policy LP tokens |
+| **Oracle** | `prmxOracleV4` | Oracle state, snapshots, final reports |
+| | `prmxMarkets` | Location registry (lat/lon for OCW) |
+| **Capital / bridge** | `assets` (id `1`) | mUSDC settlement balance SSoT |
+| | `warpAccount` | Bridge-backed liability, pending exits, exit finalization |
+| | `pallet-prmx-policy-vault-reporter` | Hyperlane vault asset reports, rebalance acks |
+| **Identity / holdings** | `prmxHoldings` | Holdings and LP balance tracking |
+| | `prmxAccountLink` | PRMX ↔ EVM wallet link |
+| **Governance / equity** | `daoCouncil` | `pallet-collective` instance, majority voting |
+| | `governanceUpgrade` | Council-authorized runtime upgrades |
+| | `prmxEquitySale` | Council-controlled PRMX sale rounds |
+| | `prmxRevenueShare` | O(1) premium distribution accumulator |
 
 ### Event types and units
 
@@ -214,43 +233,14 @@ oracle-service/src/
 
 ### API surface
 
-Ingest endpoints:
-- `POST /ingest/ping`
-- `POST /ingest/observations/batch`
-- `POST /ingest/snapshots`
-- `GET /ingest/observations/:policyId`
-- `GET /ingest/snapshots/:policyId`
-- `GET /ingest/status/:policyId`
-- `GET /ingest/stats`
-
-Policy/timeline endpoints:
-- `GET /api/policies/:policyId/timeline`
-- `GET /api/policies/:policyId/timeline/summary`
-- `GET /api/policies/:policyId/snapshots/:snapshotId`
-- `POST /api/policies/:policyId/cross-validate`
-
-Agent API endpoints (used by MCP server):
-- `GET /agent/markets` / `GET /agent/markets/:id`
-- `GET /agent/portfolio/:address`
-- `GET /agent/lp/orderbook` / `GET /agent/lp/holdings/:address`
-- `GET /agent/climate/pricing` / `GET /agent/climate/catalog`
-- `GET /agent/locations`
-- `GET /agent/dao/status`
-- `GET /agent/requests/:address`
-- `POST /agent/tx/buy-policy` / `buy-lp` / `place-lp-ask` / `cancel-lp-ask` / `cancel-request` / `expire-request` / `request-exit`
-- `POST /agent/tx/submit`
-
-DAO/admin endpoints:
-- `GET /dao/status`
-- `GET /dao/records`
-- `GET /admin/health`
-- `GET /capital/invariants`
-- `GET /capital/warp-invariant`
-- `GET /capital/warp-invariant/history`
-- `GET /capital/vault/status`
-- `GET /capital/morpho-borrower/status`
-- `GET /capital/yield-accrual/status`
-- `GET /health`
+| Group | Endpoints |
+|---|---|
+| **Ingest** (HMAC-auth) | `POST /ingest/ping` · `POST /ingest/observations/batch` · `POST /ingest/snapshots` · `GET /ingest/observations/:policyId` · `GET /ingest/snapshots/:policyId` · `GET /ingest/status/:policyId` · `GET /ingest/stats` |
+| **Policy / timeline** | `GET /api/policies/:policyId/timeline` · `GET /api/policies/:policyId/timeline/summary` · `GET /api/policies/:policyId/snapshots/:snapshotId` · `POST /api/policies/:policyId/cross-validate` |
+| **Agent** (MCP) | `GET /agent/markets[/:id]` · `GET /agent/portfolio/:address` · `GET /agent/lp/orderbook` · `GET /agent/lp/holdings/:address` · `GET /agent/climate/pricing` · `GET /agent/climate/catalog` · `GET /agent/locations` · `GET /agent/dao/status` · `GET /agent/requests/:address` · `POST /agent/tx/{buy-policy,buy-lp,place-lp-ask,cancel-lp-ask,cancel-request,expire-request,request-exit,submit}` |
+| **DAO** | `GET /dao/status` · `GET /dao/records` |
+| **Capital** | `GET /capital/invariants` · `GET /capital/warp-invariant[/history]` · `GET /capital/vault/status` · `GET /capital/morpho-borrower/status` · `GET /capital/yield-accrual/status` |
+| **Health** | `GET /health` · `GET /admin/health` |
 
 ---
 
@@ -333,34 +323,50 @@ Deployment style:
 
 ---
 
-## End-to-end flow summary
+## End-to-end flow
 
-### 1) Quote and create request
+```mermaid
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant FE as Frontend
+  participant PR as PRMX (pallets)
+  participant OS as Oracle Service
+  participant OCW as OCW
+  participant OM as Open-Meteo
+  participant BR as Hyperlane
+  participant B as Base (PolicyVault)
 
-1. User selects city/product/threshold/coverage.
-2. Frontend requests premium from pricing API (via proxy).
-3. User submits `createUnderwriteRequest` on-chain.
-4. DAO listener validates and fills/rejects request.
-5. DAO records and timeline events persist to Supabase.
+  Note over U,B: 1. Quote & request
+  U->>FE: pick city / product / threshold
+  FE->>OS: GET pricing quote
+  U->>PR: createUnderwriteRequest
+  OS->>PR: DAO underwrite (fill / reject)
 
-### 2) Observe and evaluate
+  Note over U,B: 2. Observe & evaluate
+  OCW->>OM: fetch hourly observations
+  OCW->>PR: submit snapshots
+  PR-->>OS: finalized chain events
+  OS->>OS: persist timeline (Supabase)
 
-1. OCW polls active policies.
-2. OCW fetches Open-Meteo hourly data.
-3. OCW updates oracle state / submits snapshots.
-4. Oracle service writes timeline events from finalized chain events.
+  Note over U,B: 3. Settle
+  PR->>BR: ICA: returnSettlementCapital
+  BR->>B: execute on PolicyVault
+  B-->>BR: YieldReporter delta
+  BR-->>PR: 0x0802 apply to pallet-assets(1)
+  PR->>U: payout finalized in mUSDC
+```
 
-### 3) Settle
+### Settlement state machine
 
-- `PolicyTriggered`: PRMX payout to holder, with DAO backstop covering strategy shortfall when needed to preserve the guaranteed cap.
-- `PolicyTriggered` or `PolicyMatured` should be read as finalized settlement outcomes, not merely oracle outcomes.
-- Before finalization, the system may expose an intermediate settlement-pending/liquidity-preparing state in UI and ops surfaces.
-- Vault-backed settlement finalization fails closed when `latestVaultAssets` is missing. The required-liquidity fallback is reserved for true no-vault policies so surplus Base principal cannot be silently orphaned.
-- Service and UI should distinguish:
-  - oracle outcome known
-  - Base `PolicyVault -> Reserve` return requested / pending / confirmed
-  - PRMX settlement finalized in `pallet-assets(1)`
-  - later user-initiated Base exit, if the user chooses one
+`PolicyTriggered` and `PolicyMatured` are **oracle outcomes**, not finalized payouts. UI and ops must distinguish:
+
+1. Oracle outcome known (`Triggered` / `Matured`)
+2. Base `PolicyVault → Reserve` return requested / pending / confirmed
+3. PRMX settlement finalized in `pallet-assets(1)`
+4. (Optional) user-initiated Base exit
+
+Vault-backed settlement fails closed when `latestVaultAssets` is missing — the required-liquidity fallback is reserved for true no-vault policies so surplus Base principal cannot be silently orphaned. DAO backstop covers strategy shortfall to preserve the guaranteed cap on triggered payouts.
 
 ---
 
@@ -425,26 +431,30 @@ Vault yield tracking ensures PRMX `pallet-assets(1)` accounting follows Base Pol
 
 ## References
 
-### Current architecture set
-- Capital invariants & SSoT rules: `docs/architecture/CAPITAL-INVARIANTS.md`
-- Oracle architecture: `docs/architecture/V4-ORACLE-ARCHITECTURE.md`
-- Parametric rules: `docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK.md`
-- DeFi operational patterns: `docs/architecture/DEFI-OPERATIONAL-PATTERNS.md`
+**Architecture**
 
-### Product
-- App design: `docs/product/V4-APP-DESIGN.md`
-- V4 product catalog (14 active products): `docs/product/V4-PRODUCT-CATALOG.md`
-- Product lineup taxonomy: `docs/product/PRODUCT-LINEUP.md`
-- Rain Guard rainfall spec: `docs/product/RAINGUARD-PRODUCT-SPEC.md`
-- Event expansion roadmap: `docs/product/OPEN-METEO-EVENT-EXPANSION.md`
+- [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS) — SSoT rules and the three-tier backing model
+- [Oracle Architecture](/docs/architecture/V4-ORACLE-ARCHITECTURE) — weather + capital + financial oracle roles
+- [Parametric Insurance Rulebook](/docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK) — peril taxonomy and settlement rules
+- [DeFi Operational Patterns](/docs/architecture/DEFI-OPERATIONAL-PATTERNS) — Hyperlane / vault operations
 
-### Cross-chain transport
-- `pallet-assets(1)` canonical path: [m72](/docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision)
-- Exit dispatcher: [m73](/docs/hyperlane-migration/m73-exit-dispatcher-design)
-- ICA + yield command bus: [m75](/docs/hyperlane-migration/m75-ica-yield-command-bus)
-- Hyperlane yield-report transport: [m76](/docs/hyperlane-migration/m76-yield-report-hyperlane-transport)
-- PRMX EVM user-actions surface: [m78](/docs/hyperlane-migration/m78-prmx-evm-user-actions-design)
+**Product**
 
-### Guidelines
-- UI design principles: [UI Design Principles](/docs/guidelines/UI-DESIGN-PRINCIPLES)
-- Test principles: [Test Principles](/docs/guidelines/TEST-PRINCIPLE)
+- [App Design](/docs/product/V4-APP-DESIGN) — UX flows and routes
+- [Product Catalog](/docs/product/V4-PRODUCT-CATALOG) — 14 active products
+- [Product Lineup](/docs/product/PRODUCT-LINEUP) — Rain Guard / Weather Gate / Climate Parametrics taxonomy
+- [Rainguard Product Spec](/docs/product/RAINGUARD-PRODUCT-SPEC)
+- [Open-Meteo Event Expansion](/docs/product/OPEN-METEO-EVENT-EXPANSION)
+
+**Cross-chain transport**
+
+- [m72 — pallet-assets canonical path](/docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision)
+- [m73 — Exit dispatcher](/docs/hyperlane-migration/m73-exit-dispatcher-design)
+- [m75 — ICA & yield command bus](/docs/hyperlane-migration/m75-ica-yield-command-bus)
+- [m76 — Yield-report transport](/docs/hyperlane-migration/m76-yield-report-hyperlane-transport)
+- [m78 — PRMX EVM user actions](/docs/hyperlane-migration/m78-prmx-evm-user-actions-design)
+
+**Guidelines**
+
+- [UI Design Principles](/docs/guidelines/UI-DESIGN-PRINCIPLES)
+- [Test Principles](/docs/guidelines/TEST-PRINCIPLE)

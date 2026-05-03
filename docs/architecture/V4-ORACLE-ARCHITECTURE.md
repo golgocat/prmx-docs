@@ -2,38 +2,25 @@
 
 > **Scope**: Oracle responsibilities in PRMX V4, including Hyperlane cross-chain operations.
 
-This document is the canonical role description for the V4 oracle system. The
-word "oracle" is used in three related but separate ways in PRMX:
+## Three meanings of "oracle"
 
-1. **Weather oracle**: `pallet-oracle-v4` and its offchain worker observe
-   weather, build policy snapshots, and determine whether a parametric event
-   occurred. This runs as part of the PRMX node, not as authority delegated to
-   the Node.js `oracle-service`.
-2. **Oracle service**: `oracle-service/` is the Node.js/TypeScript operational
-   service. It persists timelines, runs DAO auto-underwriting, exposes APIs, and
-   coordinates capital operations across PRMX and Base.
-3. **Capital automation**: selected oracle-service modules move cross-chain
-   workflows forward, but they do not become the settlement ledger. PRMX runtime
-   storage and Hyperlane-delivered contract effects remain authoritative.
+| Sense | Where it lives | Role |
+|---|---|---|
+| **Weather oracle** | `pallet-oracle-v4` + OCW (in the PRMX node) | Observe weather, build snapshots, determine if a parametric event occurred |
+| **Oracle service** | `oracle-service/` (Node.js/TS) | Persist timelines, run DAO underwrite, expose APIs, coordinate capital ops |
+| **Capital automation** | Selected `oracle-service` modules | Move cross-chain workflows forward — never become the settlement ledger |
 
-## Design Rules
+The settlement ledger is always PRMX runtime storage + Hyperlane-delivered contract effects.
 
-- `pallet-assets(1)` is the PRMX settlement-balance source of truth for mUSDC.
-- Oracle finality and capital settlement finality are separate phases.
-- A `Triggered` or `Matured` policy is not fully settled until PRMX settlement
-  finalization applies the payout or LP/protocol distribution in
-  `pallet-assets(1)`.
-- Deposits and exits use canonical Hyperlane routes. The oracle service must
-  not mint through an oracle-attested shortcut.
-- ICA is an operational command bus for policy vault creation, rebalance,
-  reserve return, and testnet yield commands. It is not the deposit or exit
-  transport.
-- Vault reports recognize yield/loss only after Base vault state is delivered
-  to PRMX through the current yield-report transport.
-- Principal movement is not yield. Initial funding, rebalances, and settlement
-  reserve returns are separated from policy yield/loss accounting.
-- Fail closed on missing delivery, stale freshness, missing ICA wire-up, or
-  incomplete cross-chain evidence.
+## Design rules
+
+- **`pallet-assets(1)` is the mUSDC SSoT.** All settlement balances live here.
+- **Oracle finality ≠ capital settlement finality.** A `Triggered` or `Matured` policy is fully settled only after PRMX applies the distribution in `pallet-assets(1)`.
+- **Deposits/exits use canonical Hyperlane routes.** No oracle-attested shortcut may mint mUSDC.
+- **ICA is a command bus, not a transport.** It carries vault creation, rebalance, reserve return, and yield commands — not deposits or exits.
+- **Yield is recognized only via the yield-report transport.** Base vault state must reach PRMX through `YieldReporter` → `0x0802`.
+- **Principal ≠ yield.** Funding, rebalances, and reserve returns are separated from policy yield/loss accounting.
+- **Fail closed.** Missing delivery, stale freshness, or missing ICA wire-up halts the affected workflow.
 
 ## System Context
 

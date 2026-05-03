@@ -1,31 +1,36 @@
 # PRMX Infrastructure Restart Guide
 
-This guide explains restart procedures for PRMX local development and PRMX-side cloud services, including what happens at each stage and how secrets are securely managed.
+> **Scope**: restart procedures for PRMX local development and PRMX-side cloud services.
 
 The canonical zero-start runbook for fresh chain bring-up lives in the source repo as an operator runbook and is not part of this published reading set. The default shared environment is the DO-hosted PRMX test chain + Base Sepolia, not `localhost`.
 
-Settlement note:
+## TL;DR — what to run when
 
-- Oracle finality does not automatically imply payout finality anymore.
-- A policy may remain `pending settlement` while PRMX waits for local liquidity readiness.
-- Restart and incident procedures should therefore check both oracle health and capital/liquidity readiness before declaring settlement complete.
+| Situation | Action |
+|---|---|
+| Local dev — temporary chain (default) | `./scripts/restart-dev-environment.sh` |
+| Local dev — chain data survives restarts | `--persistent` |
+| After a `git pull` or pallet change | `--build` |
+| Runtime upgrade only (no data wipe) | `node scripts/council-runtime-upgrade.mjs <wasm>` |
+| Cloud (DO) restart | See [Cloud Deployment](#cloud-deployment-public-access) |
+| Stuck Hyperlane message | See [Troubleshooting](#troubleshooting) |
 
-> **V4 Rainguard Architecture**
->
-> - **Database**: Supabase (PostgreSQL) -- MongoDB fully removed
-> - **Weather**: Open-Meteo (free, no API key) -- AccuWeather removed
-> - **Pallets**: prmxOracleV4, prmxPolicyV4, prmxMarketV4, prmxOrderbookLpV4
-> - **Pricing**: Open-Meteo observed-frequency catalog (Cloud Run)
-> - **Products**: 14 (see `docs/product/V4-PRODUCT-CATALOG.md`)
-> - **Locations**: 40 Rainguard cities across 9 regions
+> **Settlement note**: oracle finality ≠ payout finality. A policy can sit in `pending settlement` while PRMX prepares local liquidity. Restart and incident procedures must check both oracle health and capital/liquidity readiness.
 
-> **Before Starting**
->
-> - You need `INGEST_HMAC_SECRET` for OCW ingest authentication
-> - See [Environment Variables Reference](#environment-variables-reference) for details
-> - No AccuWeather API key is needed (Open-Meteo is free)
+## Architecture baseline
 
-## Table of Contents
+| Component | Stack |
+|---|---|
+| Database | Supabase (PostgreSQL) |
+| Weather provider | Open-Meteo (free, no API key) |
+| Pallets | `prmxOracleV4`, `prmxPolicyV4`, `prmxMarketV4`, `prmxOrderbookLpV4` |
+| Pricing | Open-Meteo observed catalog (Cloud Run) |
+| Products | 14 (see [Product Catalog](/docs/product/V4-PRODUCT-CATALOG)) |
+| Locations | 40 Rainguard cities across 9 regions |
+
+You need `INGEST_HMAC_SECRET` for OCW ingest auth. No AccuWeather key required.
+
+## Contents
 
 1. [Quick Start](#quick-start)
 2. [OCW Secrets](#ocw-secrets)

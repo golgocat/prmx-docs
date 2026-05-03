@@ -1,50 +1,64 @@
 # M72 — Canonical Hyperlane / `pallet-assets(1)` Path
 
-PRMX's capital architecture is fixed in this direction:
-
-- `pallet-assets(1)` is the **only bookkeeping source of truth** for settlement-asset balances on PRMX.
-- **Inbound** deposits traverse Hyperlane end-to-end before mutating PRMX balances.
-- **Outbound** exits start from the pallet path and traverse PRMX EVM → Hyperlane → Base EVM before Base collateral is released.
+> **Decision**: `pallet-assets(1)` is the only bookkeeping SSoT for settlement-asset balances on PRMX. All deposits and exits traverse Hyperlane end-to-end.
 
 ## Canonical routes
 
-### Inbound
+```mermaid
+flowchart LR
+  subgraph Base
+    BC[HypERC20Collateral]
+  end
+  subgraph HL[Hyperlane]
+    MB[Mailbox + ISM]
+  end
+  subgraph PRMX
+    SBR[SettlementBridgeRecipient]
+    P800[0x0800 precompile]
+    PA[pallet-assets&#40;1&#41;]
+    WA[warpAccount]
+    P801[0x0801 precompile]
+  end
 
-`Base HypERC20Collateral lock`
-→ `Hyperlane Mailbox`
-→ `ISM verification`
-→ `relayer / validators`
-→ `PRMX EVM SettlementBridgeRecipient`
-→ `SettlementAssetERC20`
-→ `0x0800` pallet-assets precompile
-→ `pallet-assets(1)::mint`
+  BC -->|lock| MB
+  MB -->|deliver| SBR
+  SBR --> P800 --> PA
 
-### Outbound
+  WA -->|request_exit| PA
+  PA -->|escrow / burn| P801
+  P801 -->|dispatch| MB
+  MB -->|release| BC
+```
 
-`warpAccount.request_exit`
-→ escrow / burn against `pallet-assets(1)`
-→ `EvmDispatchHook`
-→ `PRMX EVM dispatch surface`
-→ `Hyperlane Mailbox`
-→ `ISM verification`
-→ `relayer / validators`
-→ `Base HypERC20Collateral release`
+### Inbound (deposit)
+
+`Base HypERC20Collateral.lock` → Hyperlane Mailbox + ISM → PRMX EVM `SettlementBridgeRecipient` → `SettlementAssetERC20` → `0x0800` precompile → `pallet-assets(1)::mint`
+
+### Outbound (exit)
+
+`warpAccount.request_exit` → escrow/burn against `pallet-assets(1)` → `EvmDispatchHook` → PRMX EVM dispatcher → Hyperlane Mailbox + ISM → `Base HypERC20Collateral.release`
 
 The concrete outbound dispatcher subdesign is in [m73 — Exit Dispatcher design](/docs/hyperlane-migration/m73-exit-dispatcher-design).
 
-## What this means concretely
+## What this rules out
 
-- PRMX does **not** treat the PRMX EVM synthetic balance as an independent ledger.
-- PRMX does **not** accept an oracle-attested mint path.
-- PRMX does **not** accept direct `HypERC20Synthetic.transferRemote()` exits.
+| Forbidden path | Why |
+|---|---|
+| Treating PRMX EVM synthetic balance as an independent ledger | Two ledgers diverge; only `pallet-assets(1)` is authoritative |
+| Oracle-attested mint path | Bypasses Hyperlane proof; breaks 1:1 backing audit |
+| Direct `HypERC20Synthetic.transferRemote()` exits | Skips pallet escrow + dispatcher validation |
 
-Repository defaults reflect this:
+## Repository enforcement
 
-- `oracle-service` only runs in observe mode for inbound (`HYPERLANE_DEPOSIT_ATTEST_MODE=observe`); canonical inbound expects `SettlementBridgeRecipient` to mint before any DB row is promoted.
-- `hyperlane-deposit-watcher` requires `HYPERLANE_DEST_SETTLEMENT_BRIDGE_RECIPIENT_ADDRESS` and does not consume PRMX synthetic `ReceivedTransferRemote` logs for live delivery tracking.
-- `scripts/hyperlane-smoke/{deposit,exit}.mjs` reject any non-canonical transport override.
-- Zero-start config clears `HYPERLANE_DEST_SYNTHETIC_ADDRESS`, so a fresh generation does not preserve that stale env surface.
+- `oracle-service` runs inbound in observe mode only (`HYPERLANE_DEPOSIT_ATTEST_MODE=observe`); canonical inbound expects `SettlementBridgeRecipient` to mint before any DB row is promoted.
+- `hyperlane-deposit-watcher` requires `HYPERLANE_DEST_SETTLEMENT_BRIDGE_RECIPIENT_ADDRESS` and ignores synthetic `ReceivedTransferRemote` logs.
+- `scripts/hyperlane-smoke/{deposit,exit}.mjs` reject non-canonical transport overrides.
+- Zero-start config clears `HYPERLANE_DEST_SYNTHETIC_ADDRESS`.
 
 ## Monitoring
 
-The bridge-net counter is `warpAccount.bridgeMintedTotal`. The Tier 2 invariant is `B ≈ EVM_total = collateral + PolicyVaults + settlement-transient` (see [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS)). Direct PRMX EVM synthetic balances are not part of this audit — they are not a settlement ledger.
+Bridge-net counter: `warpAccount.bridgeMintedTotal`.
+
+Tier 2 invariant: `B ≈ EVM_total = collateral + PolicyVaults + settlement-transient`. See [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS).
+
+PRMX EVM synthetic balances are explicitly excluded from this audit — they are not a settlement ledger.

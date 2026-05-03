@@ -2,24 +2,22 @@
 
 > **Scope**: UX/UI for V4 policy purchase, request lifecycle, and policy monitoring.
 
-This document defines the product UX for PRMX V4 and is aligned with the current frontend routes/components.
-
-Related docs:
-
-- Product lineup taxonomy: `docs/product/PRODUCT-LINEUP.md`
-- Product catalog (14 active pricing products): `docs/product/V4-PRODUCT-CATALOG.md`
-- System architecture: `docs/architecture/V4-ARCHITECTURE.md`
-- Parametric insurance rules: `docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK.md`
-- Visual system: `docs/guidelines/UI-DESIGN-PRINCIPLES.md`
-
----
-
 ## Goals
 
-- **Fast purchase**: create a request in under ~60 seconds (connect wallet -> quote -> submit).
-- **Clarity**: users understand payout, trigger, threshold, coverage window, and that settlement may finalize after liquidity readiness.
-- **Verifiability**: all lifecycle transitions are backed by on-chain state and timeline events.
-- **Operator-friendly**: chain/oracle/DAO health is visible without requiring direct DB access.
+| Goal | What it means |
+|---|---|
+| **Fast purchase** | Wallet → quote → submit in ~60 seconds |
+| **Clarity** | User understands payout, trigger, threshold, coverage window, and settlement-finalizes-after-liquidity |
+| **Verifiability** | Every lifecycle transition is backed by on-chain state + timeline events |
+| **Operator-friendly** | Chain / oracle / DAO health visible without direct DB access |
+
+## Related docs
+
+- [Product Lineup](/docs/product/PRODUCT-LINEUP) — taxonomy
+- [Product Catalog](/docs/product/V4-PRODUCT-CATALOG) — 14 active pricing products
+- [V4 Architecture](/docs/architecture/V4-ARCHITECTURE) — system architecture
+- [Parametric Insurance Rulebook](/docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK) — insurance rules
+- [UI Design Principles](/docs/guidelines/UI-DESIGN-PRINCIPLES) — visual system
 
 ---
 

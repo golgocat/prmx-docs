@@ -1,25 +1,27 @@
 # PRMX Parametric Insurance Rulebook
-Design, implementation, and verification rules for building robust parametric insurance.
 
-The canonical settlement asset is `USDC`. PRMX-side internal settlement credits are backed 1:1 by canonical USDC on the EVM side via the Hyperlane Warp Route.
+> **What this is**: design, implementation, and verification rules for building robust parametric insurance on PRMX. **No exceptions.** If an exception is needed, extend the spec, add tests + audit logs, and define migration before shipping.
 
-## 0. Purpose
-Maintain the following properties across all insurance products offered by PRMX:
+The canonical settlement asset is `USDC`. PRMX-side settlement credits are backed 1:1 by USDC on Base via Hyperlane Warp Route.
 
-- No implementation without unambiguous definitions
-- No divergence between specification and implementation
+## Purpose
+
+Maintain these properties across every PRMX product:
+
+- Unambiguous definitions before implementation
+- No divergence between specification and code
 - Resilience against unexpected input, missing data, delays, duplicates, and tampering
-- Pricing, underwriting, event monitoring, decision, and payout bound by consistent invariants
-- Reproducibility, auditability, and explainability at all times
+- Pricing, underwriting, monitoring, decision, and payout bound by consistent invariants
+- Reproducibility, auditability, and explainability — always
 
-This document is a **rulebook** — no exceptions. If an exception is needed, extend the specification, add tests and audit logs, and define compatibility and migration procedures at the same time.
+### Status legend
 
-### 0.1 Implementation Status Legend
-Each item is annotated with one of the following:
-- ✅ Implemented — working in the current codebase
-- 🔧 Partial — directionally correct but incomplete
-- 📋 Planned — to be implemented
-- 🔮 Future — not needed for current products but required when extending
+| Marker | Meaning |
+|---|---|
+| ✅ | Implemented — working in the current codebase |
+| 🔧 | Partial — directionally correct but incomplete |
+| 📋 | Planned — to be implemented |
+| 🔮 | Future — required when extending beyond current products |
 
 ## 1. Terminology and Common Definitions
 Do not implement anything while undefined terms remain in this section.

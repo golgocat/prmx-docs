@@ -4,7 +4,19 @@
 
 PRMX V4 is a Substrate-based parametric weather insurance system. It mints a 1:1-backed settlement asset (`mUSDC`) on PRMX from USDC locked on Base Sepolia via Hyperlane, prices weather products from a 31-year ERA5 catalog, and settles policies on-chain when measured weather events trigger their thresholds.
 
-This guide orders the documentation so that a new engineer can build a full mental model of the system end-to-end.
+```mermaid
+flowchart LR
+  U[User] --> FE[Frontend]
+  FE --> PR[PRMX Chain]
+  FE --> OS[Oracle Service]
+  OS <--> PR
+  PR <-->|Hyperlane| B[Base Sepolia]
+  OS -->|reads| B
+  OCW[OCW] --> PR
+  OCW -->|weather| OM[Open-Meteo]
+```
+
+Read top-to-bottom — each section builds on the previous one.
 
 ---
 
