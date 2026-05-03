@@ -1,48 +1,59 @@
 # M73 — Canonical Outbound Exit Design
 
-PRMX outbound exits use a **dispatcher + recipient + bridge** split that keeps the PRMX EVM synthetic token out of the user-balance ledger and keeps Hyperlane / collateral custody contracts as small as possible.
+> **TL;DR**: PRMX outbound exits use a **dispatcher + recipient + bridge** split. User balances stay in `pallet-assets(1)`; the Hyperlane dispatcher cannot emit a message unless pallet state authorizes it; Base release is allowance-backed and idempotent.
 
 ## Route
 
-```text
-warpAccount.request_exit
-→ pallet escrow on pallet-assets(1)
-→ pallet PendingExits
-→ keeper-submitted, relayer-visible PRMX EVM tx
-→ PRMX EVM SettlementExitDispatcher
-→ Hyperlane Mailbox / ISM / relayer / validators
-→ Base EVM SettlementExitRecipient
-→ Base EVM SettlementExitBridge
-→ PrmxHypERC20Collateral allowance-backed release
-→ watcher-driven warpAccount.finalize_exit
+```mermaid
+flowchart LR
+  subgraph PRMX
+    W[warpAccount.request_exit] --> PE[pallet PendingExits]
+    PE --> SED[SettlementExitDispatcher]
+  end
+  subgraph HL[Hyperlane]
+    MB[Mailbox + ISM]
+  end
+  subgraph Base
+    SER[SettlementExitRecipient] --> SEB[SettlementExitBridge]
+    SEB --> COL[PrmxHypERC20Collateral]
+    COL --> U[user wallet]
+  end
+  SED -->|dispatch| MB
+  MB -->|process| SER
+  SEB -.ExitReleased.-> FE[warpAccount.finalize_exit]
+  FE --> PE
 ```
 
-The runtime `EvmDispatchHook` is intentionally a no-op. Pallet exits do not create Frontier-invisible Hyperlane dispatches; transport authority is the pallet `PendingExits` state, surfaced through the `0x0801` read-only precompile and validated inside the dispatcher.
+The runtime `EvmDispatchHook` is intentionally a **no-op**. Pallet exits never emit Frontier-invisible Hyperlane dispatches. Transport authority is `PendingExits` state, surfaced through the `0x0801` read-only precompile and validated inside the dispatcher.
 
-## Why this shape
+## Design rules
 
-- **No dual ledger on PRMX.** User balances stay authoritative only in `pallet-assets(1)`.
-- **No hidden runtime-internal mailbox dispatches.** All Hyperlane sends are EVM transactions emitted through Frontier RPC logs, so the relayer indexes them normally.
-- **No transport authority on the keeper EOA.** The dispatcher rejects any payload that does not match `PendingExits[exitId]`, so an oracle-service keeper cannot release funds for an exit the pallet did not create.
-- **Custody contract stays small.** Outbound release logic lives in a PRMX-owned `SettlementExitBridge`, not inside the Hyperlane-derived collateral subclass.
+| Rule | Why |
+|---|---|
+| User balances stay in `pallet-assets(1)` | No dual ledger on PRMX; PRMX EVM synthetic balances are not authoritative |
+| All Hyperlane sends are EVM transactions | Relayer indexes them via Frontier RPC; runtime-internal dispatches would poison sequence indexing |
+| Dispatcher rejects payloads that don't match `PendingExits[exitId]` | Keeper EOA has no transport authority |
+| Outbound release lives in `SettlementExitBridge`, not the collateral subclass | Hyperlane-derived custody contract stays small |
 
-## Contracts and responsibilities
+## Contracts at a glance
 
-### 1. PRMX EVM — `SettlementExitDispatcher`
+| Side | Contract | Role |
+|---|---|---|
+| PRMX EVM | `SettlementExitDispatcher` | Validates pending exit, formats `ExitMessageV1`, pays Hyperlane gas, calls `Mailbox.dispatch` |
+| Base EVM | `SettlementExitRecipient` | ISM-aware Hyperlane handler; verifies origin/sender/version, computes commitment, forwards to bridge |
+| Base EVM | `SettlementExitBridge` | PRMX-owned executor + replay guard; pulls USDC from collateral, emits `ExitReleased` |
+| Base EVM | `PrmxHypERC20Collateral` | Custody contract; grants allowance to bridge via `approveTokenForBridge` |
 
-Responsibilities:
+## PRMX — `SettlementExitDispatcher`
 
-- accept dispatch submissions
-- validate the supplied request against `PendingExits[exitId]` via the `0x0801` precompile
-- format the outbound `ExitMessageV1` payload
-- pay Hyperlane dispatch gas from its own prefunded native balance
-- call PRMX `Mailbox.dispatch(...)`
-- emit `ExitDispatched(exitId, messageId, recipient, amount, routeId)`
+Validates against `PendingExits[exitId]` via the `0x0801` precompile, formats `ExitMessageV1`, pays Hyperlane gas from its prefunded native balance, calls `Mailbox.dispatch(...)`, emits `ExitDispatched(...)`.
 
 Submission policy:
 
-- `authorizedCaller == address(0)`: permissionless / keeper-driven (intended deployment mode)
-- `authorizedCaller != address(0)`: emergency throttle that restricts submission to one address
+| `authorizedCaller` | Mode |
+|---|---|
+| `address(0)` | Permissionless / keeper-driven (intended deployment mode) |
+| `!= address(0)` | Emergency throttle: restricts submission to one address |
 
 External surface:
 
@@ -63,19 +74,13 @@ event ExitDispatched(
 );
 ```
 
-If dispatcher native balance is insufficient, `dispatchExit(...)` reverts. The pallet exit remains pending and retryable.
+If the dispatcher's native balance is insufficient, `dispatchExit(...)` reverts and the pallet exit stays pending and retryable.
 
-### 2. Base EVM — `SettlementExitRecipient`
+## Base — `SettlementExitRecipient`
 
-Implements `IMessageRecipient`. Verifies:
+Implements `IMessageRecipient`. Verifies `msg.sender == Base Mailbox`, `origin == PRMX_DOMAIN`, `sender == trustedSender`, payload `version`, and payload `routeId == expectedRouteId`. Computes the replay/audit commitment and forwards to `SettlementExitBridge.releaseExit(...)`.
 
-- `msg.sender == Base Mailbox`
-- `origin == PRMX_DOMAIN`
-- `sender == trustedSender` (padded PRMX dispatcher address)
-- payload `version`
-- payload `routeId == expectedRouteId`
-
-Computes a replay/audit commitment and forwards to `SettlementExitBridge.releaseExit(...)`.
+ISM-aware: the Base Mailbox does not fall back to the default DomainRouting ISM for PRMX-origin messages.
 
 ```solidity
 function handle(uint32 origin, bytes32 sender, bytes calldata message) external payable;
@@ -91,15 +96,13 @@ event ExitMessageHandled(
 );
 ```
 
-The recipient is explicitly ISM-aware so the Base Mailbox does not fall back to the default DomainRouting ISM for PRMX-origin messages.
+## Base — `SettlementExitBridge`
 
-### 3. Base EVM — `SettlementExitBridge`
+PRMX-owned executor + replay guard. **Not** a reserve holder.
 
-PRMX-owned executor + replay guard. Not a reserve holder.
-
-- holds `processedExitCommitments[exitId]`
-- pulls USDC from the active collateral via `transferFrom`
-- emits the canonical `ExitReleased` event that PRMX watchers finalize against
+- Stores `processedExitCommitments[exitId]`.
+- Pulls USDC from the active collateral via `transferFrom`.
+- Emits the canonical `ExitReleased` event that PRMX watchers finalize against.
 
 ```solidity
 function releaseExit(
@@ -119,12 +122,13 @@ event ExitReleased(
 );
 ```
 
-Release semantics:
+Release semantics (caller must be `recipientContract`):
 
-- `msg.sender` must equal `recipientContract`
-- if `processedExitCommitments[exitId] == 0`: store `commitment`, `transferFrom(collateral, recipient, amount)`, emit `ExitReleased`, return `true`
-- if `processedExitCommitments[exitId] == commitment`: idempotent duplicate, no transfer, return `false`
-- if `processedExitCommitments[exitId] != commitment`: revert `CommitmentMismatch`
+| `processedExitCommitments[exitId]` | Action |
+|---|---|
+| `0` (unseen) | Store `commitment`, `transferFrom(collateral, recipient, amount)`, emit `ExitReleased`, return `true` |
+| `== commitment` | Idempotent duplicate; no transfer; return `false` |
+| `!= commitment` | Revert with `CommitmentMismatch` |
 
 One-time owner wiring (Council motions):
 
@@ -132,9 +136,9 @@ One-time owner wiring (Council motions):
 - `SettlementExitRecipient.setExitBridge(SettlementExitBridge)`
 - `SettlementExitBridge.setRecipientContract(SettlementExitRecipient)`
 
-### 4. Base EVM — `PrmxHypERC20Collateral`
+## Base — `PrmxHypERC20Collateral`
 
-Custody contract. Holds the active reserve USDC, enforces source-side deposit gating, and grants allowance to `SettlementExitBridge` via the inherited `approveTokenForBridge(...)` surface. Outbound release logic does not live here.
+Custody contract. Holds the active reserve USDC, enforces source-side deposit gating, and grants allowance to `SettlementExitBridge` via the inherited `approveTokenForBridge(...)` surface. Outbound release logic lives in the bridge, not here.
 
 ## Payload schema
 
@@ -168,42 +172,46 @@ bytes32 commitment = keccak256(
 
 `IMessageRecipient.handle(...)` does not receive Hyperlane `messageId`, so `origin + sender + decoded payload` is the replay/audit fingerprint.
 
-## Runtime hook
+## Why the runtime hook is a no-op
 
-`HyperlaneExitDispatchHook` is the runtime side of `WarpDispatchHook<AccountId, Balance, ExitId>`. Its current implementation returns `Ok(())` and does not invoke `pallet_evm::Runner::call(...)`.
+`HyperlaneExitDispatchHook` returns `Ok(())` and never calls `pallet_evm::Runner::call(...)`.
 
-Reason: runtime-internal `Runner::call` emits `pallet_evm::Log` events visible in `system.events` but **not** returned by Frontier `eth_getLogs`. Hyperlane relayers index PRMX as an Ethereum chain via RPC logs, so a hidden dispatch advances mailbox / merkle sequence counters without giving the relayer the logs it needs, which poisons contiguous sequence indexing.
+Runtime-internal `Runner::call` emits `pallet_evm::Log` events visible in `system.events` but **not** in Frontier `eth_getLogs`. Hyperlane relayers index PRMX as an Ethereum chain via RPC logs, so a hidden dispatch would advance mailbox / merkle counters without giving the relayer the logs it needs — poisoning contiguous sequence indexing.
 
 The visible PRMX EVM transaction to `SettlementExitDispatcher` is therefore the canonical transport submission point. Any keeper / user / relayer helper may submit it; pallet state remains the authority.
 
-## Sequence
+## End-to-end sequence
 
-1. **Request.** User submits `warpAccount.request_exit(routeId, amount, evmRecipient)`. Pallet checks balance, transfers to escrow, inserts `PendingExits[exitId]`, emits `ExitRequested`.
-2. **Eligible.** Pallet calls the no-op `EvmDispatchHook`. The exit remains in `PendingExits[exitId]` waiting for a visible PRMX dispatcher tx.
-3. **Dispatch.** A keeper submits `SettlementExitDispatcher.dispatchExit(...)`. Dispatcher reads `0x0801.pendingExit(exitId)` and rejects missing pending exits, route/recipient/amount mismatches, and duplicate dispatches. On success it pays Hyperlane gas, calls `Mailbox.dispatch(...)`, and emits `ExitDispatched`.
-4. **Deliver.** Validators sign checkpoints, relayer submits Base `Mailbox.process(...)`, `SettlementExitRecipient.handle(...)` runs, computes the commitment, calls `SettlementExitBridge.releaseExit(...)`, which `transferFrom`s USDC out of the active collateral and emits `ExitReleased`.
-5. **Finalize.** Watcher observes `ExitReleased`, extracts the Base EVM tx hash, and calls `warpAccount.finalize_exit(exitId, evm_tx_hash)`. Pallet removes `PendingExits[exitId]`, burns the escrowed `pallet-assets(1)` balance, decrements `BridgeMintedTotal`, inserts `FinalizedExitTxHashes[evm_tx_hash]` and `ProcessedExits[exitId]`.
+| # | Step | What happens |
+|---|---|---|
+| 1 | Request | User submits `warpAccount.request_exit`. Pallet escrows balance, inserts `PendingExits[exitId]`, emits `ExitRequested` |
+| 2 | Eligible | No-op `EvmDispatchHook` runs; exit waits for a visible PRMX dispatcher tx |
+| 3 | Dispatch | Keeper calls `SettlementExitDispatcher.dispatchExit(...)`. Dispatcher reads `0x0801.pendingExit(exitId)`, rejects mismatches, pays Hyperlane gas, calls `Mailbox.dispatch`, emits `ExitDispatched` |
+| 4 | Deliver | Validators sign; relayer calls Base `Mailbox.process(...)`; `SettlementExitRecipient.handle` computes commitment; `SettlementExitBridge.releaseExit` `transferFrom`s USDC; emits `ExitReleased` |
+| 5 | Finalize | Watcher observes `ExitReleased`, calls `warpAccount.finalize_exit(exitId, evm_tx_hash)`. Pallet removes `PendingExits`, burns escrowed assets, decrements `BridgeMintedTotal`, inserts replay guards |
 
-If the active reserve is short, the `transferFrom` reverts, `handle(...)` reverts, and the message remains undelivered until reserve is refilled and the relayer retries.
+If the active reserve is short on Base, `transferFrom` reverts, `handle(...)` reverts, and the message stays undelivered until the reserve refills and the relayer retries.
 
-## Oracle-service / watcher
+## Oracle-service watcher
 
-- `getExitReleaseState()` reads `SettlementExitBridge.processedExitCommitments(exitId)` and scans `SettlementExitBridge.ExitReleased`.
-- An oracle-service submitter may act as a keeper for `dispatchExit(...)` but treats `authorizedCaller() == address(0)` as the expected mode and skips the operator-equality check.
-- Event/log scanning is idempotent; the keeper does not spam already-dispatched exits.
+- `getExitReleaseState()` reads `SettlementExitBridge.processedExitCommitments(exitId)` and scans `ExitReleased` events.
+- Oracle-service may act as a `dispatchExit` keeper. It treats `authorizedCaller() == address(0)` as expected and skips the operator-equality check.
+- Event/log scanning is idempotent; already-dispatched exits are not retried.
 
 ## Security properties
 
-- **No dual ledger on PRMX.** `pallet-assets(1)` is authoritative.
-- **No EOA transport authority.** The dispatcher cannot emit a Hyperlane message unless pallet state matches.
-- **Atomic failure on underfunded dispatch.** The dispatcher reverts; the pallet exit stays retryable.
-- **Atomic failure on insufficient Base reserve.** Delivery stays pending until reserve is refilled.
-- **Idempotent Base release.** Duplicate same-commitment deliveries do not double-release.
-- **Replay guard on PRMX finalize.** `evm_tx_hash` cannot be reused across `finalize_exit` calls.
-- **Custody contract stays small.** Release logic lives in `SettlementExitBridge`, not in the Hyperlane-derived collateral subclass.
+| Property | Guard |
+|---|---|
+| No dual ledger on PRMX | `pallet-assets(1)` is the only authoritative balance store |
+| No EOA transport authority | Dispatcher rejects unless `PendingExits[exitId]` matches |
+| Atomic failure on underfunded dispatch | Dispatcher reverts; pallet exit stays retryable |
+| Atomic failure on short Base reserve | Delivery stays pending until reserve refills |
+| Idempotent Base release | Duplicate same-commitment deliveries return `false` (no double-release) |
+| Replay guard on PRMX finalize | `evm_tx_hash` cannot be reused across `finalize_exit` |
+| Custody contract stays small | Release logic lives in `SettlementExitBridge`, not the Hyperlane-derived collateral subclass |
 
-## Intentional non-goals
+## Non-goals
 
 - No attempt to make Base release succeed when the reserve is short.
 - No attempt to burn PRMX supply before Base release is confirmed.
-- No support for direct PRMX EVM `HypERC20Synthetic.transferRemote()` as a permanent exit path.
+- No support for direct `HypERC20Synthetic.transferRemote()` as a permanent exit path.

@@ -1,55 +1,31 @@
 # PRMX Rain Guard Product Spec
 
-> **Scope**: Core rainfall line in the PRMX portfolio.
+> **Scope**: Core rainfall line in the PRMX portfolio. Sister lines are **Weather Gate** (non-rain weather) and **Climate Parametrics** (catalog-first specialty). Canonical taxonomy lives in [Product Lineup](/docs/product/PRODUCT-LINEUP).
 
-## Position in Portfolio
-
-PRMX V4 uses a 3-line structure:
-
-- **PRMX Rain Guard**: rainfall products (this document)
-- **PRMX Weather Gate**: non-rain weather products
-- **PRMX Climate Parametrics**: catalog-first specialty products
-
-Canonical taxonomy: `docs/product/PRODUCT-LINEUP.md`.
-
-## Rain Guard Product Matrix
+## Product matrix
 
 | Product | Event Type | Peril ID | Coverage | Thresholds |
 |---|---|---|---|---|
-| Storm Protection | `Precip12hMaxGte` | `rainfall_7d_12h_accum_binary` | Fixed 7 days | 20, 30, 40, 50, 75, 100 mm |
-| Daily Total | `PrecipSumGte` | `rainfall_7d_24h_total_binary` | Fixed 24h | 20, 30, 40, 50, 75, 100 mm |
-| Hourly Intensity | `Precip1hGte` | `rainfall_7d_1h_max_binary` | Fixed 7 days | 5, 10, 15, 20, 30 mm/h |
+| Storm Protection | `Precip12hMaxGte` | `rainfall_7d_12h_accum_binary` | 7 days | 20, 30, 40, 50, 75, 100 mm |
+| Daily Total | `PrecipSumGte` | `rainfall_7d_24h_total_binary` | 24 h | 20, 30, 40, 50, 75, 100 mm |
+| Hourly Intensity | `Precip1hGte` | `rainfall_7d_1h_max_binary` | 7 days | 5, 10, 15, 20, 30 mm/h |
 
-Rain Guard products are purchasable from both `/rainguard` (standalone page) and `/climate-parametrics` (unified Protection Terminal).
+Purchase routes: `/rainguard` (standalone) and `/climate-parametrics` (unified Protection Terminal).
 
-## Product Semantics
+## Product semantics
 
-### Storm Protection (`Precip12hMaxGte`)
+| Product | Trigger condition | Aggregation state |
+|---|---|---|
+| Storm Protection | Any rolling 12-hour precipitation sum meets/exceeds threshold | `AggStateV4::Precip12hMax { max_12h_mm_x1000 }` |
+| Daily Total | Cumulative 24-hour precipitation meets/exceeds threshold | `AggStateV4::PrecipSum { sum_mm_x1000 }` |
+| Hourly Intensity | 1-hour max rainfall intensity meets/exceeds threshold | `AggStateV4::Precip1hMax { max_1h_mm_x1000 }` |
 
-- Trigger condition: any rolling 12-hour precipitation sum meets/exceeds threshold.
-- Coverage window: fixed 7 days.
-- Aggregation state: `AggStateV4::Precip12hMax { max_12h_mm_x1000 }`.
+**Early trigger** — all three products may settle before coverage end once threshold conditions are reached.
 
-### Daily Total (`PrecipSumGte`)
+## Units and encoding
 
-- Trigger condition: cumulative precipitation over policy period meets/exceeds threshold.
-- Coverage window: fixed 24 hours.
-- Aggregation state: `AggStateV4::PrecipSum { sum_mm_x1000 }`.
-
-### Hourly Intensity (`Precip1hGte`)
-
-- Trigger condition: 1-hour max rainfall intensity meets/exceeds threshold.
-- Coverage window: fixed 7 days.
-- Aggregation state: `AggStateV4::Precip1hMax { max_1h_mm_x1000 }`.
-
-### Early Trigger
-
-All three Rain Guard products support early trigger behavior and may settle before coverage end once threshold conditions are reached.
-
-## Units and Encoding
-
-- Rainfall thresholds use `MmX1000` (`50 mm` -> `50000`).
-- Frontend quote path uses `/api/pricing` with `peril_id`, `threshold`, `coverage`, `duration_in_hours`.
+- Rainfall thresholds use `MmX1000` (`50 mm → 50000`).
+- Frontend quote path: `/api/pricing` with `peril_id`, `threshold`, `coverage`, `duration_in_hours`.
 - Proxy validation currently allows durations `24` and `168` hours.
 
 ## Request Examples
@@ -82,8 +58,8 @@ All three Rain Guard products support early trigger behavior and may settle befo
 }
 ```
 
-## References
+## Related
 
-- `docs/product/PRODUCT-LINEUP.md`
-- `docs/product/V4-APP-DESIGN.md`
-- `docs/product/V4-PRODUCT-CATALOG.md`
+- [Product Lineup](/docs/product/PRODUCT-LINEUP)
+- [V4 App Design](/docs/product/V4-APP-DESIGN)
+- [V4 Product Catalog](/docs/product/V4-PRODUCT-CATALOG)

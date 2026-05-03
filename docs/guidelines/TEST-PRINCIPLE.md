@@ -1,281 +1,182 @@
 # PRMX Test Design Rulebook
 
-**V4 Rainguard**
-**Agent Reference (Cursor-ready)**
+> **V4 Rainguard — agent reference.** In PRMX, test quality defines product quality. This rulebook **overrides** implementation convenience, development speed, UI/UX priorities, and short-term business decisions.
 
----
-
-## Purpose
-
-This rulebook defines the immutable rules for test design in PRMX.
-
-> **In PRMX, test quality defines product quality.**
-
-All humans and AI agents must follow this document when designing tests.
-
-This rulebook **overrides**:
-- implementation convenience
-- development speed
-- UI / UX priorities
-- short-term business decisions
-
----
-
-## 1. Absolute Principles
+## 1. Absolute principles
 
 ### Principle 1: Testing is an act of destruction
 
-Tests are **not** for confirming expected behavior.
-Tests exist to **break the system**.
+Tests do not confirm expected behavior; they exist to **break the system**.
 
-**Mandatory:**
-- At least **50%** of test cases must be abnormal, boundary, or adversarial
-- Test suites composed only of happy paths are **invalid**
-
----
+- At least **50%** of test cases must be abnormal, boundary, or adversarial.
+- Test suites composed only of happy paths are **invalid**.
 
 ### Principle 2: Money and finality are P0
 
-Anything related to money or finality is top priority.
+Always treat as P0: insurance payouts, Early Trigger, maturity settlement, idempotency (no double execution), policy state transitions.
 
-**Always treat the following as P0:**
-- Insurance payouts
-- Early Trigger
-- Maturity settlement
-- Idempotency (double execution prevention)
-- Policy state transitions
-
-P0 logic must be tested at **all three layers**:
-- Unit
-- Integration
-- End-to-End
-
----
+P0 logic must be tested at **all three layers**: unit, integration, end-to-end.
 
 ### Principle 3: Oracles are hostile by default
 
-Oracles must be treated as **unreliable and adversarial** external systems.
+Oracles are unreliable and adversarial external systems. Mandatory oracle-failure tests:
 
-**Mandatory oracle failure tests:**
-- delayed data
-- missing data
-- duplicated submissions
-- out-of-order delivery
-- invalid values (NaN, negative, extreme)
-- partial success (off-chain success, on-chain failure)
+| Failure | Required test |
+|---|---|
+| Delayed data | Trigger-window late delivery |
+| Missing data | Intermediate / final observation absent |
+| Duplicated submissions | Idempotency on retry |
+| Out-of-order delivery | Snapshot reordering |
+| Invalid values | NaN, negative, extreme magnitudes |
+| Partial success | Off-chain success but on-chain failure |
 
----
+## 2. Mandatory test classification
 
-## 2. Mandatory Test Classification
-
-Every test must be classified into exactly one or more of the following:
+Every test must carry **one or more** of these labels (unclassified tests are invalid):
 
 | Code | Classification |
-|------|----------------|
+|---|---|
 | **A** | Economic Integrity |
 | **B** | State Machine Safety |
 | **C** | Temporal Consistency |
 | **D** | Off-chain Interaction |
 | **E** | Adversarial User Behavior |
 
-> Unclassified tests are invalid.
+## 3. V4 product model (14 active products)
 
----
+| Line | Product | Event Type | Time model | Notes |
+|---|---|---|---|---|
+| Rain Guard | Storm Protection | `Precip12hMaxGte` | 12 h rolling max | Sensitive to window boundaries |
+| Rain Guard | Daily Total | `PrecipSumGte` | 24 h cumulative | Vulnerable to ordering and missing data |
+| Rain Guard | Hourly Intensity | `Precip1hGte` | 1 h max | Highest temporal resolution |
+| Weather Gate | Heat | `TempMaxGte` | 7 d max | `≥ threshold` |
+| Weather Gate | Frost | `TempMinLte` | 7 d min | `≤ threshold` (inverted) |
+| Weather Gate | Wind Damage | `WindGustMaxGte` | 7 d max | |
+| Weather Gate | Precipitation Type | `PrecipTypeOccurred` | Bitmask | `snow=2, ice=4, snow-or-ice=6` |
+| Climate Parametrics | Heat Index | `HeatIndexMaxGte` | 7 d max | |
+| Climate Parametrics | Snow Accumulation | `SnowDepthMaxGte` | 7 d max | |
+| Climate Parametrics | Pressure Drop | `PressureDropMaxGte` | 7 d max | |
+| Climate Parametrics | Low Sunshine | `SunshineDurationSumLte` | 7 d sum | `≤ threshold` (inverted) |
+| Climate Parametrics | Flood | `RiverDischargeMaxGte` | 7 d max | |
+| Climate Parametrics | Marine Storm | `WaveHeightMaxGte` | 7 d max | |
+| Climate Parametrics | Air Quality | `Pm25MaxGte` | 7 d max | |
 
-## 3. V4 Product Model (14 Active Products)
+All 14 products share oracle infrastructure (Open-Meteo, Supabase) and Pricing API validation. Two operators are inverted (`TempMinLte`, `SunshineDurationSumLte`). **Highest risk: incorrect product routing or evaluation.**
 
-### Rain Guard (3 products)
+## 4. Mandatory declarations per test
 
-**Storm Protection** (`Precip12hMaxGte`): 12-hour rolling window maximum. Sensitive to window boundaries. Short-term spike driven.
+Every test case must declare:
 
-**Daily Total** (`PrecipSumGte`): 24-hour cumulative rainfall. Multiple snapshots aggregated. Vulnerable to ordering and missing data. Cumulative (integration) risk.
-
-**Hourly Intensity** (`Precip1hGte`): 1-hour max rainfall intensity. Highest temporal resolution, most sensitive to single-hour data gaps.
-
-### Weather Gate (4 products)
-
-**Heat Protection** (`TempMaxGte`): 7-day max temperature `>=` threshold. **Frost Protection** (`TempMinLte`): 7-day min temperature `<=` threshold (inverted operator). **Wind Damage** (`WindGustMaxGte`): 7-day max wind gust. **Precipitation Type** (`PrecipTypeOccurred`): Bitmask match (snow=2, ice=4, snow-or-ice=6).
-
-### Climate Parametrics (7 products)
-
-**Heat Index** (`HeatIndexMaxGte`), **Snow Accumulation** (`SnowDepthMaxGte`), **Pressure Drop** (`PressureDropMaxGte`), **Low Sunshine** (`SunshineDurationSumLte` — inverted operator), **Flood** (`RiverDischargeMaxGte`), **Marine Storm** (`WaveHeightMaxGte`), **Air Quality** (`Pm25MaxGte`).
-
-### Cross-product considerations
-- All 14 products share oracle infrastructure (Open-Meteo, Supabase)
-- All use Pricing API for pricing validation
-- Different aggregation logic per product (rolling max, cumulative sum, min tracking, bitmask match)
-- Two inverted operators (`<=`): TempMinLte, SunshineDurationSumLte
-- **Highest risk: incorrect product routing or evaluation**
-
----
-
-## 4. Mandatory Test Declarations
-
-Every test case must explicitly declare:
-- **target product(s):** one or more of the 14 active products (e.g., Storm Protection, Daily Total, Frost Protection, etc.) or "all"
-- **time model:** rolling-window / cumulative / min-tracking / bitmask / other
-- whether **product routing** is involved
-- whether **migration or upgrade** is involved
+- **Target product(s)** — one or more of the 14, or "all".
+- **Time model** — rolling-window / cumulative / min-tracking / bitmask / other.
+- Whether **product routing** is involved.
+- Whether **migration or upgrade** is involved.
 
 > Undeclared tests are forbidden.
 
----
-
-## 5. Storm Protection Rules (`Precip12hMaxGte`)
-
-### Primary failure modes:
-- 12h window boundary inclusion/exclusion
-- delayed data causing missed trigger within window
-- noise-driven false positives in high-frequency data
-
-### Mandatory tests:
-- exact 12h window boundary tests
-- delayed oracle delivery where trigger should have fired
-- duplicated oracle reports (idempotency)
-- cross-batch window persistence (13-hour history)
+## 5. Storm Protection rules (`Precip12hMaxGte`)
 
 > **Storm Protection is most fragile at window boundaries.**
 
----
+| Failure mode | Mandatory test |
+|---|---|
+| 12 h window boundary inclusion/exclusion | Exact-boundary tests |
+| Delayed data causing missed trigger | Late oracle delivery where trigger should have fired |
+| Duplicated oracle reports | Idempotency on retry |
+| Window persistence across batches | 13-hour history span |
 
-## 6. Daily Total Rules (`PrecipSumGte`)
-
-### Primary failure modes:
-- missing snapshots within 24h period
-- out-of-order snapshots
-- duplicate aggregation
-- cumulative error amplification
-
-### Mandatory rules:
-- cumulative values must be defined by a **set of observations**, not arrival order
-- if arrival order matters, invalid ordering must be **explicitly rejected**
-
-### Mandatory P0 tests:
-- missing intermediate observation
-- missing final observation
-- reversed snapshot order
-- duplicated timestamps
-- Early Trigger followed by maturity settlement (no double payout)
-- duration boundaries (minimum and maximum)
-- abnormal values and cumulative amplification
+## 6. Daily Total rules (`PrecipSumGte`)
 
 > **Daily Total is most fragile with ordering and missing data.**
 
----
+Cumulative values must be defined by a **set of observations**, not arrival order. If arrival order matters, invalid ordering must be **explicitly rejected**.
 
-## 7. Cross-Product and Infrastructure Rules
+Mandatory P0 tests: missing intermediate / final observations, reversed snapshot order, duplicated timestamps, Early Trigger followed by maturity settlement (no double payout), duration boundaries (min and max), abnormal values, cumulative error amplification.
 
-Every infrastructure test must declare at least one tag:
+## 7. Cross-product & infrastructure
 
-| Tag | Description |
-|-----|-------------|
-| **A** | product coexistence (both evaluated from same oracle data) |
-| **B** | oracle infrastructure (Open-Meteo, Supabase, OCW) |
-| **C** | DAO auto-underwrite (Pricing API pricing validation) |
-| **D** | cross-validation (ERA5 + NASA POWER audit) |
+Every infrastructure test must carry at least one tag:
 
-> Untagged infrastructure tests are forbidden.
+| Tag | Scope |
+|---|---|
+| **A** | Product coexistence (multiple products evaluated from same oracle data) |
+| **B** | Oracle infrastructure (Open-Meteo, Supabase, OCW) |
+| **C** | DAO auto-underwrite (Pricing API validation) |
+| **D** | Cross-validation (ERA5 + NASA POWER audit) |
 
----
+### 7.1 Product routing (P0)
 
-### 7.1 Product Routing is P0
+- Each of the 14 event types routes to its correct evaluator (rolling-window, cumulative, min-tracking, bitmask).
+- Inverted operators (`≤`) for `TempMinLte` and `SunshineDurationSumLte` are correctly applied.
+- `PrecipTypeOccurred` bitmask matching works for all mask values (2, 4, 6).
+- Unknown event types are rejected.
+- DAO whitelist filtering works per product type (14 event types × 40 cities).
 
-**Mandatory tests:**
-- Each of the 14 event types routes to its correct evaluator (e.g., `Precip12hMaxGte` → rolling-window, `PrecipSumGte` → cumulative, `TempMinLte` → min-tracking)
-- Inverted operators (`<=`) for `TempMinLte` and `SunshineDurationSumLte` are correctly applied
-- `PrecipTypeOccurred` bitmask matching works for all mask values (2, 4, 6)
-- Unknown event types are rejected
-- DAO whitelist filtering works per product type (all 14 event types, all 40 cities)
+### 7.2 Migration & upgrade safety (P0)
 
----
-
-### 7.2 Migration and Upgrade Safety (P0)
-
-**Mandatory tests:**
-- migration is idempotent (0, 1, N executions converge)
-- upgrade interruption and recovery
-- active policies complete after upgrade
-- total assets, reserves, and policy counts are preserved
+- Migration is idempotent (0, 1, N executions converge).
+- Upgrade interruption and recovery.
+- Active policies complete after upgrade.
+- Total assets, reserves, and policy counts are preserved.
 
 > Migration correctness is part of the **specification**, not an implementation detail.
 
----
+### 7.3 Off-chain consistency (P0)
 
-### 7.3 Off-chain Consistency (P0)
+- Recovery from partial success.
+- At-least-once delivery convergence.
+- Replay safety.
+- Oracle/node restarts do not create duplicate monitoring.
+- Supabase write idempotency (deterministic composite keys).
 
-**Mandatory tests:**
-- recovery from partial success
-- at-least-once delivery convergence
-- replay safety
-- oracle or node restarts do not create duplicate monitoring
-- Supabase write idempotency (deterministic composite keys)
-
----
-
-### 7.4 Operational and Governance Controls (If Introduced)
-
-If pause, emergency stop, or risk limits exist, they are **P0**.
-
-**Mandatory tests:**
-- behavior during pause
-- settlement behavior for triggers occurring before pause
-- authority boundaries
-- behavior when risk limits are reached
+### 7.4 Operational & governance controls (P0 if present)
 
 > **Operational features must be attacked first, not last.**
 
----
+- Behavior during pause.
+- Settlement behavior for triggers occurring before pause.
+- Authority boundaries.
+- Behavior when risk limits are reached.
 
-## 8. Mandatory Test Design Template
-
-Every test case must include:
+## 8. Mandatory test design template
 
 | Field | Description |
-|-------|-------------|
-| **Test name** | Unique identifier for the test |
-| **Target product** | One or more of 14 active products, or "all" |
-| **Classification** | A-E (from Section 2) |
-| **Expected failure mode** | What the test attempts to break |
-| **Attacker perspective** | How a malicious actor would exploit this |
-| **Expected defense** | How the system should prevent exploitation |
-| **Success criteria** | Clear pass/fail conditions |
-| **Impact if broken** | funds / trust / legal |
+|---|---|
+| Test name | Unique identifier |
+| Target product | One of 14, or "all" |
+| Classification | A–E (Section 2) |
+| Expected failure mode | What the test attempts to break |
+| Attacker perspective | How a malicious actor would exploit this |
+| Expected defense | How the system should prevent exploitation |
+| Success criteria | Clear pass/fail conditions |
+| Impact if broken | funds / trust / legal |
 
----
+## 9. Coverage definition
 
-## 9. Coverage Definition (Numeric Coverage Forbidden)
+> **Numeric (percentage) code coverage is not an accepted metric.**
 
-> Do not rely on percentage code coverage.
+Accepted coverage metrics:
 
-**Accepted coverage metrics:**
-- state transition coverage
-- economic scenario coverage
-- oracle failure scenario count
-- migration completion scenarios
-- cross-product arbitrage scenarios
+- State-transition coverage
+- Economic-scenario coverage
+- Oracle-failure scenario count
+- Migration-completion scenarios
+- Cross-product arbitrage scenarios
 
----
-
-## 10. AI Agent Self-Audit Checklist
+## 10. AI agent self-audit
 
 Before finalizing a test suite, the agent must verify:
 
 - [ ] Can a malicious human profit if this fails?
 - [ ] Will this survive future specification changes?
-- [ ] Can I clearly explain why this test exists?
+- [ ] Can the test's existence be clearly justified?
 
-> Tests that fail this self-audit must be **removed**.
+Tests that fail this self-audit must be **removed**.
 
----
-
-## 11. Failure Severity Classification
+## 11. Severity
 
 | Severity | Description | Action |
-|----------|-------------|--------|
-| **P0** | fund loss, double payout, product routing failure | immediate halt |
-| **P1** | unfairness, broken insurance experience | fix before redeploy |
-| **P2** | UI, logs, non-critical observability | backlog |
-
----
-
-**End of Rulebook**
+|---|---|---|
+| **P0** | Fund loss, double payout, product-routing failure | Immediate halt |
+| **P1** | Unfairness, broken insurance experience | Fix before redeploy |
+| **P2** | UI, logs, non-critical observability | Backlog |

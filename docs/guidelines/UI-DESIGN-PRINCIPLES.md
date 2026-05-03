@@ -1,26 +1,24 @@
 # PRMX UI Design Principles
 
-> Scope: Terminal workspace, landing pages, and all product surfaces.
+> **Scope**: Terminal workspace, landing pages, and all product surfaces.
 
-## Design Intent
+## Two surfaces, one token system
 
-The PRMX UI has two distinct design surfaces:
+| Surface | Tone | Use |
+|---|---|---|
+| **Terminal Workspace** | Dark, grid-backed console; professional, high density, inspectable | Operational pages (dashboard, policies, vault, DAO, agents) |
+| **Landing Pages** | Cinematic marketing; gradient cards, parallax, branded product lines | Marketing routes (`/`, `/products`, `/start`, etc.) |
 
-1. **Terminal Workspace** — a dark, grid-backed console for climate risk operations. Professional tone, high density, inspectable data.
-2. **Landing Pages** — cinematic marketing surfaces with gradient cards, parallax, and branded product lines.
+Both share the same font stack and color tokens but diverge in tone and layout.
 
-Both share the same font stack and color token system but diverge in tone and layout.
+## Non-negotiables
 
-## Non-Negotiables
-
-1. **Terminal workspace** routes use the `.terminal-workspace` class (applied in the dashboard layout). Never apply landing-page gradients or marketing visuals inside it.
-2. No logo art and no emoji icons in workspace UI. Lucide icons only.
+1. Terminal workspace routes apply the `.terminal-workspace` class (set in the dashboard layout). Never apply landing-page gradients or marketing visuals inside it.
+2. No logo art and no emoji icons in workspace UI — Lucide icons only.
 3. Data-first composition (tables/rows before card mosaics).
-4. Traceability on critical workflows:
-   - Show endpoint/context JSON and replay `curl` for pricing and policy views.
-5. Visual indicators that improve comprehension stay in place:
-   - Coverage/threshold progress bars, status badges, timeline states.
-6. Role-based navigation: DAO-only pages (Vault, DAO Underwrite, Oracle, Agents, Control Plane) are hidden from customer/LP roles.
+4. Critical workflows expose endpoint/context JSON and replayable `curl` (pricing, policy views).
+5. Comprehension-improving indicators stay in place — coverage/threshold progress bars, status badges, timeline states.
+6. Role-based nav — DAO-only pages (Vault, DAO Underwrite, Oracle, Agents, Control Plane) are hidden from customer/LP roles.
 
 ## Visual System
 
@@ -375,11 +373,13 @@ No custom SVG icons or emoji are used in the workspace.
 
 A workspace page is complete when:
 
-1. Uses `.terminal-workspace` inherited styles (no raw background overrides).
-2. No emoji or logo art appears in operational workspace screens.
-3. Loading skeleton and error states are handled.
-4. Policy detail provides progress + timeline + raw data access.
-5. Pricing workflows expose replayable endpoint context.
-6. Role-based elements are gated via `useUserRole()`.
-7. Light mode does not break layout (terminal workspace is dark-only, but shared components must handle both).
-8. Lint/build pass with no regressions.
+| # | Check |
+|---|---|
+| 1 | Uses `.terminal-workspace` inherited styles (no raw background overrides) |
+| 2 | No emoji or logo art on operational screens |
+| 3 | Loading skeleton + error states handled |
+| 4 | Policy detail surfaces progress + timeline + raw data |
+| 5 | Pricing workflows expose replayable endpoint context |
+| 6 | Role-based elements gated via `useUserRole()` |
+| 7 | Light mode does not break layout (terminal workspace is dark-only; shared components must handle both) |
+| 8 | Lint and build pass with no regressions |

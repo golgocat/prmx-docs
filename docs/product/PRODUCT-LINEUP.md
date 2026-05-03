@@ -4,11 +4,11 @@
 
 ## Line Architecture
 
-| Line | Mission | Current Scope |
+| Line | Mission | Scope |
 |---|---|---|
-| **PRMX Rain Guard** | Core rainfall parametric protection with clear rain-trigger semantics | 3 products (Storm Protection, Daily Total, Hourly Intensity) |
-| **PRMX Weather Gate** | General weather-trigger protection beyond rainfall | 4 products (Heat, Frost, Wind, Precipitation Type) |
-| **PRMX Climate Parametrics** | Expanded climate and specialty parametrics from catalog-active perils | 7 products |
+| **PRMX Rain Guard** | Core rainfall parametric protection | 3 products — Storm, Daily Total, Hourly Intensity |
+| **PRMX Weather Gate** | Non-rainfall weather triggers | 4 products — Heat, Frost, Wind, Precipitation Type |
+| **PRMX Climate Parametrics** | Catalog-first climate / specialty parametrics | 7 products |
 
 ## Portfolio Matrix (14 Active Catalog Products)
 
@@ -29,25 +29,28 @@
 | Marine Storm Protection (7-Day) | `wave_height_max_7d_binary` | `WaveHeightMaxGte` | **PRMX Climate Parametrics** | App + chain + catalog |
 | Air Quality Protection (7-Day) | `pm25_max_7d_binary` | `Pm25MaxGte` | **PRMX Climate Parametrics** | App + chain + catalog |
 
-## UX and Routing Strategy
+## UX and Routing
 
-- **Primary purchase route**: `/climate-parametrics` ("Protection Terminal" in sidebar). This unified page exposes all 14 products grouped by product line.
-- **Standalone product routes**: `/rainguard` and `/weather-gate` are standalone purchase pages with their own product-line scoped tabs.
-- **Landing pages**: `/products` hub links to `/products/rain-guard`, `/products/weather-gate`, `/products/climate-parametrics` for marketing/detail pages.
-- Present products grouped by line: Rain Guard first, Weather Gate second, Climate Parametrics third.
-- All 14 active catalog products are purchasable from the app workspace.
+| Route | Purpose |
+|---|---|
+| `/climate-parametrics` | Primary purchase route ("Protection Terminal"). Unified view of all 14 products grouped by line |
+| `/rainguard` | Standalone Rain Guard purchase page |
+| `/weather-gate` | Standalone Weather Gate purchase page |
+| `/products` | Marketing hub → `/products/rain-guard`, `/products/weather-gate`, `/products/climate-parametrics` |
 
-## Activation Gates (Future Product Additions)
+Display order in catalogs and pickers: **Rain Guard → Weather Gate → Climate Parametrics**. All 14 active catalog products are purchasable from the app.
 
-1. Runtime + OCW support exists for the peril's trigger logic.
+## Activation gates for new products
+
+1. Runtime + OCW support for the peril's trigger logic.
 2. Oracle snapshot computation supports the peril state shape.
 3. Frontend mapping (`peril_id`, thresholds, units) is added.
 4. Pricing proxy validation allowlist is updated.
 5. End-to-end settlement tests pass.
 
-## Related Docs
+## Related
 
-- `docs/product/RAINGUARD-PRODUCT-SPEC.md`
-- `docs/product/V4-APP-DESIGN.md`
-- `docs/product/V4-PRODUCT-CATALOG.md`
-- `docs/product/OPEN-METEO-EVENT-EXPANSION.md`
+- [Rainguard Product Spec](/docs/product/RAINGUARD-PRODUCT-SPEC)
+- [V4 App Design](/docs/product/V4-APP-DESIGN)
+- [V4 Product Catalog](/docs/product/V4-PRODUCT-CATALOG)
+- [Open-Meteo Event Expansion](/docs/product/OPEN-METEO-EVENT-EXPANSION)

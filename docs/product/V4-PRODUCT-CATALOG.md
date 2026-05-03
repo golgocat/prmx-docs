@@ -1,30 +1,30 @@
 # PRMX V4 Product Catalog (14 Products)
 
-> **Scope**: Canonical product reference for all products currently active in the V4 pricing catalog.
+> **Scope**: All products currently active in the V4 pricing catalog.
 
-This document tracks products returned by:
-
-- `GET /v4/catalog/info/live`
-- API base: `https://neuralgcm-pricing-api-pm6goneopq-as.a.run.app`
-
-Active catalog: **`obs-openmeteo-14prod-2026-03-12`** — 14 products, 40 cities, 638,352 entries, 31yr ERA5 reanalysis.
+| Field | Value |
+|---|---|
+| Active catalog | `obs-openmeteo-14prod-2026-03-12` |
+| Products | 14 |
+| Cities | 40 |
+| Catalog entries | 638,352 |
+| Reanalysis source | 31-year ERA5 |
+| Catalog endpoint | `GET /v4/catalog/info/live` |
+| API base | `https://neuralgcm-pricing-api-pm6goneopq-as.a.run.app` |
 
 ---
 
 ## Shared specs
 
-- Product count: **14 active products** (3 removed: UV Index, Drought, Low Visibility — ERA5 returns null data)
-- Geography: **40 supported regions/cities**
-- Observation window: **168 hours (7 days)** for most products; **24 hours** for PrecipSumGte (Daily Total)
-- Payout shape: **binary**
-- Thresholds: discrete bucket values per product
-- Quote API field is named `threshold_mm` for compatibility, but unit varies by product
+- **Geography** — 40 supported regions/cities.
+- **Observation window** — 168 h (7 days) for most products; 24 h for `PrecipSumGte` (Daily Total).
+- **Payout shape** — binary.
+- **Thresholds** — discrete bucket values per product.
+- **Quote API field** — `threshold_mm` (named for backward compatibility; unit varies by product).
 
 ---
 
 ## Product lines
-
-PRMX product naming is organized into 3 lines:
 
 | Product line | Scope |
 |---|---|
@@ -32,23 +32,20 @@ PRMX product naming is organized into 3 lines:
 | **PRMX Weather Gate** | General weather-trigger products (4) |
 | **PRMX Climate Parametrics** | Catalog-first expansion products (7) |
 
-Canonical taxonomy: `docs/product/PRODUCT-LINEUP.md`.
+Canonical taxonomy: [Product Lineup](/docs/product/PRODUCT-LINEUP).
 
 ---
 
 ## Activation matrix
 
-| Layer | Current scope |
+| Layer | Scope |
 |------|----------------|
-| Pricing catalog (`/v4/catalog/info/live`) | 14 products (3 removed due to null ERA5 data) |
+| Pricing catalog (`/v4/catalog/info/live`) | 14 products |
 | Frontend `/climate-parametrics` (Protection Terminal) | 14 products (unified purchase flow) |
-| On-chain `EventTypeV4` coverage | 14 enum variants (3 removed from enum: indices 7, 9, 11; remaining indices codec-pinned) |
-| DAO default whitelist | 14 event types (all active products) |
+| On-chain `EventTypeV4` enum | 14 variants |
+| DAO default whitelist | 14 event types |
 
-Interpretation:
-
-- **Catalog-active** means the pricing API can return quotes for the product.
-- **Purchasable in app** additionally requires event-type wiring in frontend + on-chain + DAO whitelist/config.
+A product is **purchasable in app** when it has all four: pricing entry, frontend mapping, on-chain event type, and DAO whitelist coverage.
 
 ---
 
@@ -64,36 +61,35 @@ Interpretation:
 
 ## Product specifications
 
-| # | Display name | Product line | Peril ID | Tier | Threshold buckets | Trigger condition | Current activation |
-|---|--------------|--------------|----------|------|-------------------|------------------|-------------------|
-| 1 | Storm Protection (7-Day) | **PRMX Rain Guard** | `rainfall_7d_12h_accum_binary` | `tier_1` | 20, 30, 40, 50, 75, 100 mm | Any 12h rolling precipitation max within 7d `>= threshold` | App + chain + catalog |
-| 2 | Daily Total | **PRMX Rain Guard** | `rainfall_7d_24h_total_binary` | `tier_1` | 20, 30, 40, 50, 75, 100 mm | Daily precipitation total within 24h `>= threshold` | App + chain + catalog |
-| 3 | Hourly Intensity (7-Day) | **PRMX Rain Guard** | `rainfall_7d_1h_max_binary` | `tier_1` | 5, 10, 15, 20, 30 mm/h | 1-hour max rainfall intensity within 7d `>= threshold` | App + chain + catalog |
-| 4 | Heat Protection (7-Day) | **PRMX Weather Gate** | `temp_max_7d_binary` | `tier_1` | 35, 38, 40, 42, 45 °C | Maximum temperature within 7d `>= threshold` | App + chain + catalog |
-| 5 | Frost Protection (7-Day) | **PRMX Weather Gate** | `temp_min_7d_binary` | `tier_1` | 0, -3, -5, -10 °C | Minimum temperature within 7d `<= threshold` | App + chain + catalog |
-| 6 | Wind Damage Protection (7-Day) | **PRMX Weather Gate** | `wind_gust_max_7d_binary` | `tier_1` | 15, 20, 25, 30 m/s | Maximum wind gust within 7d `>= threshold` | App + chain + catalog |
-| 7 | Precipitation Type (7-Day) | **PRMX Weather Gate** | `precip_type_7d_binary` | `tier_1` | 2, 4, 6 mask | Precipitation type bitmask match occurs | App + chain + catalog |
-| 8 | Heat Index Protection (7-Day) | **PRMX Climate Parametrics** | `heat_index_max_7d_binary` | `tier_2` | 35, 38, 40, 42, 45 °C | Heat index max within 7d `>= threshold`* | App + chain + catalog |
-| ~~8~~ | ~~UV Index Protection (7-Day)~~ | ~~**PRMX Weather Gate**~~ | ~~`uv_index_max_7d_binary`~~ | | | | **REMOVED** — ERA5 returns null for `uv_index` |
-| ~~9~~ | ~~Drought Protection (7-Day)~~ | ~~**PRMX Climate Parametrics**~~ | ~~`soil_moisture_min_7d_binary`~~ | | | | **REMOVED** — ERA5 returns null for `soil_moisture_0_to_10cm` |
-| 9 | Snow Accumulation Protection (7-Day) | **PRMX Climate Parametrics** | `snow_depth_max_7d_binary` | `tier_2` | 50, 100, 200, 500 mm | Snow depth max within 7d `>= threshold`* | App + chain + catalog |
-| ~~11~~ | ~~Low Visibility Protection (7-Day)~~ | ~~**PRMX Climate Parametrics**~~ | ~~`visibility_min_7d_binary`~~ | | | | **REMOVED** — ERA5 returns null for `visibility` |
-| 10 | Severe Weather Protection (7-Day) | **PRMX Climate Parametrics** | `pressure_drop_max_7d_binary` | `tier_2` | 5, 10, 15, 20 hPa | Pressure-drop max within 7d `>= threshold`* | App + chain + catalog |
-| 11 | Low Sunshine Protection (7-Day) | **PRMX Climate Parametrics** | `sunshine_duration_7d_binary` | `tier_2` | 7200, 14400, 21600, 28800 s/day | Sunshine-duration sum condition (low-sun trigger) `<= threshold`* | App + chain + catalog |
-| 12 | Flood Protection (7-Day) | **PRMX Climate Parametrics** | `river_discharge_max_7d_binary` | `tier_3` | 500, 1000, 2000, 5000 m³/s | River discharge max within 7d `>= threshold`* | App + chain + catalog |
-| 13 | Marine Storm Protection (7-Day) | **PRMX Climate Parametrics** | `wave_height_max_7d_binary` | `tier_3` | 2, 3, 4, 6 m | Wave height max within 7d `>= threshold`* | App + chain + catalog |
-| 14 | Air Quality Protection (7-Day) | **PRMX Climate Parametrics** | `pm25_max_7d_binary` | `tier_3` | 35, 50, 100, 150 μg/m³ | PM2.5 max within 7d `>= threshold`* | App + chain + catalog |
+| # | Display name | Product line | Peril ID | Tier | Threshold buckets | Trigger condition |
+|---|---|---|---|---|---|---|
+| 1 | Storm Protection (7-Day) | Rain Guard | `rainfall_7d_12h_accum_binary` | `tier_1` | 20, 30, 40, 50, 75, 100 mm | 12h rolling precipitation max within 7d `≥ threshold` |
+| 2 | Daily Total | Rain Guard | `rainfall_7d_24h_total_binary` | `tier_1` | 20, 30, 40, 50, 75, 100 mm | Daily precipitation total within 24h `≥ threshold` |
+| 3 | Hourly Intensity (7-Day) | Rain Guard | `rainfall_7d_1h_max_binary` | `tier_1` | 5, 10, 15, 20, 30 mm/h | 1-hour max rainfall intensity within 7d `≥ threshold` |
+| 4 | Heat Protection (7-Day) | Weather Gate | `temp_max_7d_binary` | `tier_1` | 35, 38, 40, 42, 45 °C | Max temperature within 7d `≥ threshold` |
+| 5 | Frost Protection (7-Day) | Weather Gate | `temp_min_7d_binary` | `tier_1` | 0, -3, -5, -10 °C | Min temperature within 7d `≤ threshold` |
+| 6 | Wind Damage Protection (7-Day) | Weather Gate | `wind_gust_max_7d_binary` | `tier_1` | 15, 20, 25, 30 m/s | Max wind gust within 7d `≥ threshold` |
+| 7 | Precipitation Type (7-Day) | Weather Gate | `precip_type_7d_binary` | `tier_1` | 2, 4, 6 mask | Precipitation-type bitmask match occurs |
+| 8 | Heat Index Protection (7-Day) | Climate Parametrics | `heat_index_max_7d_binary` | `tier_2` | 35, 38, 40, 42, 45 °C | Heat-index max within 7d `≥ threshold`* |
+| 9 | Snow Accumulation Protection (7-Day) | Climate Parametrics | `snow_depth_max_7d_binary` | `tier_2` | 50, 100, 200, 500 mm | Snow depth max within 7d `≥ threshold`* |
+| 10 | Severe Weather Protection (7-Day) | Climate Parametrics | `pressure_drop_max_7d_binary` | `tier_2` | 5, 10, 15, 20 hPa | Pressure-drop max within 7d `≥ threshold`* |
+| 11 | Low Sunshine Protection (7-Day) | Climate Parametrics | `sunshine_duration_7d_binary` | `tier_2` | 7,200, 14,400, 21,600, 28,800 s/day | Sunshine-duration sum (low-sun trigger) `≤ threshold`* |
+| 12 | Flood Protection (7-Day) | Climate Parametrics | `river_discharge_max_7d_binary` | `tier_3` | 500, 1,000, 2,000, 5,000 m³/s | River discharge max within 7d `≥ threshold`* |
+| 13 | Marine Storm Protection (7-Day) | Climate Parametrics | `wave_height_max_7d_binary` | `tier_3` | 2, 3, 4, 6 m | Wave height max within 7d `≥ threshold`* |
+| 14 | Air Quality Protection (7-Day) | Climate Parametrics | `pm25_max_7d_binary` | `tier_3` | 35, 50, 100, 150 μg/m³ | PM2.5 max within 7d `≥ threshold`* |
 
-`*` For tier 2/3 products, comparator wording is inferred from `peril_id` naming and display labels because `catalog/info/live` does not expose a formal comparator field.
+All 14 are **App + chain + catalog** active.
+
+`*` For tier 2/3 products, comparator wording is inferred from `peril_id` naming and display labels — `catalog/info/live` does not expose a formal comparator field.
 
 ---
 
 ## Event type mapping (runtime)
 
-Current `EventTypeV4` enum directly maps to these catalog products:
+Each catalog product maps directly to one `EventTypeV4` variant:
 
-| Event type | Product(s) |
-|------------|------------|
+| Event type | Product |
+|---|---|
 | `Precip12hMaxGte` | Storm Protection |
 | `PrecipSumGte` | Daily Total |
 | `Precip1hGte` | Hourly Intensity |
@@ -109,25 +105,22 @@ Current `EventTypeV4` enum directly maps to these catalog products:
 | `WaveHeightMaxGte` | Marine Storm Protection |
 | `Pm25MaxGte` | Air Quality Protection |
 
-`UvIndexMaxGte` (index 7), `SoilMoistureMinLte` (index 9), and `VisibilityMinLte` (index 11) have been **removed from the `EventTypeV4` enum**. Their codec indices are permanently skipped to preserve SCALE compatibility for the remaining 14 variants.
+SCALE codec indices `7`, `9`, and `11` are reserved (skipped) to preserve compatibility for the 14 active variants.
 
 ---
 
-## Practical activation checklist for future products
+## Adding a new product
 
-To move a future catalog product into purchasable UX:
-
-1. Add/confirm runtime `EventTypeV4` + `AggStateV4` coverage for that peril.
-2. Implement OCW fetch + aggregation logic for required weather field(s).
-3. Map peril-to-event type in frontend purchase flow (`frontend/src/lib/product-specs.ts` — single source of truth).
-4. Extend pricing proxy whitelist (`frontend/src/app/api/pricing/route.ts`).
-5. Add product to DAO event-type whitelist and validation path.
-6. Add end-to-end lifecycle tests (request -> monitoring -> settlement).
+1. Add runtime `EventTypeV4` + `AggStateV4` coverage for the peril.
+2. Implement OCW fetch + aggregation for the required weather fields.
+3. Add a peril-to-event-type mapping in `frontend/src/lib/product-specs.ts` (SSoT).
+4. Extend the pricing proxy allowlist in `frontend/src/app/api/pricing/route.ts`.
+5. Add the product to the DAO event-type whitelist and validation path.
+6. Add an end-to-end lifecycle test (request → monitoring → settlement).
 
 ---
 
-## Notes
+## Related
 
-- This catalog doc supersedes older “2-product only” references for pricing-catalog coverage.
-- Rainfall-only semantics are defined in `docs/product/RAINGUARD-PRODUCT-SPEC.md`.
-- Product-line taxonomy is defined in `docs/product/PRODUCT-LINEUP.md`.
+- Rainfall-only semantics — [Rainguard Product Spec](/docs/product/RAINGUARD-PRODUCT-SPEC).
+- Product-line taxonomy — [Product Lineup](/docs/product/PRODUCT-LINEUP).
