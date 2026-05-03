@@ -1,7 +1,7 @@
 # PRMX Parametric Insurance Rulebook
 Design, implementation, and verification rules for building robust parametric insurance.
 
-> Settlement asset migration note: this rulebook historically used `USDT` as the canonical settlement asset. The current implementation target is `USDC`, with PRMX-side internal settlement credits backed by canonical USDC on the EVM side. Remaining `USDT` references in this document should be read as settlement-asset legacy terminology until the text is fully migrated.
+The canonical settlement asset is `USDC`. PRMX-side internal settlement credits are backed 1:1 by canonical USDC on the EVM side via the Hyperlane Warp Route.
 
 ## 0. Purpose
 Maintain the following properties across all insurance products offered by PRMX:
@@ -145,7 +145,6 @@ Multi-source strategy for improved decision accuracy:
 | Layer | Source | Endpoint | Latency | Independence | Status |
 |---|---|---|---|---|---|
 | Settlement source | Open-Meteo Historical API (ECMWF IFS) | `archive-api.open-meteo.com/v1/archive` | 6h update cadence | Open-Meteo historical model (~9 km) | ✅ `http_client.rs` |
-| Legacy reference only | Open-Meteo Forecast API | `api.open-meteo.com/v1/forecast` | Near real-time | NWP model output | 🔒 not settlement |
 | Confirmation / audit | Open-Meteo Historical API (ECMWF IFS) | `archive-api.open-meteo.com/v1/archive` | 6h update cadence | ECMWF IFS (~9 km) | ✅ `era5.ts` |
 | Independent verification | NASA POWER API (MERRA-2) | `power.larc.nasa.gov/api/temporal/hourly/point` | Near real-time | NASA reanalysis (~50 km) | ✅ `nasa-power.ts` |
 | Ground truth (US cities) | NOAA NCEI (ISD) | `ncei.noaa.gov/access/services/data/v1` | Hours to days | Station observations | 🔮 |
@@ -221,10 +220,8 @@ DAO auto-underwrite acceptance criteria:
 
 ## 5. Pricing 🔧
 
-### 5.1 Current Pricing Models
-- **Open-Meteo Observed Catalog (current)**: ERA5 reanalysis frequency counting, 14 products, 40 cities ✅
-- **NeuralGCM Ensemble (deprecated)**: AI climate forecasting model, replaced by Open-Meteo catalog
-- **R Markov Chain (offline)**: Legacy statistical model, Luzon-only
+### 5.1 Pricing Model
+- **Open-Meteo Observed Catalog**: ERA5 reanalysis frequency counting, 14 products, 40 cities ✅
 
 ### 5.2 Pricing Responsibilities
 | Output | Status | Notes |

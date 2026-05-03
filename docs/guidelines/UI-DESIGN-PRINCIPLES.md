@@ -1,6 +1,5 @@
 # PRMX UI Design Principles
 
-> Status: Current (updated 2026-03-31)
 > Scope: Terminal workspace, landing pages, and all product surfaces.
 
 ## Design Intent

@@ -1,9 +1,8 @@
 # Open-Meteo Event Expansion Roadmap (V4)
 
-> **Status**: Implemented snapshot (updated 2026-03-31)
 > **Purpose**: Track E2E implementation depth by event type.
 
-## Verified Current State (2026-03-31)
+## Current State
 
 | Layer | Current State |
 |---|---|

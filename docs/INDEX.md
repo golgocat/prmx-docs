@@ -1,12 +1,10 @@
 # PRMX V4 — Engineer Reading Guide
 
 > **Audience**: engineers learning the PRMX V4 architecture and design.
-> **Status**: curated reading set (updated 2026-05-03).
-> **Generation**: post-Hyperlane-cutover (2026-04-19), runtime spec ≥ 510, Hyperbridge fully retired.
 
 PRMX V4 is a Substrate-based parametric weather insurance system. It mints a 1:1-backed settlement asset (`mUSDC`) on PRMX from USDC locked on Base Sepolia via Hyperlane, prices weather products from a 31-year ERA5 catalog, and settles policies on-chain when measured weather events trigger their thresholds.
 
-This guide orders the documentation so that a new engineer can build a full mental model of the system without wading through historical migration notes or operator runbooks. Pre-cutover designs and superseded plans live in the source repo's `docs/archive/` directory and are only referenced for audit-trail purposes.
+This guide orders the documentation so that a new engineer can build a full mental model of the system end-to-end.
 
 ---
 
@@ -17,7 +15,7 @@ Read in this order to get end-to-end coverage:
 | # | Document | What you will learn |
 |---|----------|--------------------|
 | 1 | [V4 Architecture](/docs/architecture/V4-ARCHITECTURE) | The whole system: Substrate runtime pallets, Frontier EVM precompiles, off-chain oracle service, Open-Meteo OCW, Vercel frontend, MCP server, and where each piece lives. |
-| 2 | [V4 Oracle Architecture](/docs/architecture/V4-ORACLE-ARCHITECTURE) | Oracle responsibilities: weather observation ingest, snapshot finalization, and the Route 2 capital / vault / rebalancer / yield-reporter workers run by the oracle service. |
+| 2 | [V4 Oracle Architecture](/docs/architecture/V4-ORACLE-ARCHITECTURE) | Oracle responsibilities: weather observation ingest, snapshot finalization, and the capital / vault / rebalancer / yield-reporter workers run by the oracle service. |
 | 3 | [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS) | The two non-negotiable rules: 1:1 USDC↔mUSDC backing, and `pallet-assets(1)` as the single source of truth for all PRMX balances. Reading this before touching capital code prevents the most damaging class of bug. |
 | 4 | [Parametric Insurance Rulebook](/docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK) | How parametric insurance is modeled in V4: peril taxonomy, threshold semantics, settlement decision rules, dispute windows. |
 
@@ -25,9 +23,9 @@ After section 1 you should be able to answer: *what does PRMX do, who keeps bala
 
 ---
 
-## 2 — Cross-chain transport (post-cutover designs)
+## 2 — Cross-chain transport
 
-Hyperlane Warp Route + Interchain Accounts (ICA) is the **only** transport between PRMX and Base. The Hyperbridge ISMP path was retired on 2026-04-19. These five design docs describe the live path:
+Hyperlane Warp Route + Interchain Accounts (ICA) is the only transport between PRMX and Base. These five design docs describe it:
 
 | # | Document | What you will learn |
 |---|----------|--------------------|
@@ -67,29 +65,17 @@ Read these when working on the relevant area, not as part of onboarding:
 
 ---
 
-## 5 — Out of scope for new readers
-
-The following directories exist in the source repository for traceability but are **not** part of the engineer reading set published here:
-
-- `docs/archive/` — pre-cutover Hyperbridge plans, V1/V2/V3 oracle history, superseded per-entity vault designs, and the original Hyperlane migration plan as audit trail. Use only when researching *why* the current design exists.
-- `docs/hyperlane-migration/m41`–`m77` operator runbooks — cutover, queue cleanup, validator ops, kill-switch drill, zero-start. Useful for SREs, not for understanding the architecture.
-- `docs/plans/` — frozen or draft future plans (Basket Token, Parametric Insurance Platform, AI Agent Platform). Not load-bearing for V4.
-- `mcp-server/TOOLS.md` — MCP tool reference for LLM agents integrating against PRMX. Lives outside the docs tree.
-- `tasks/` — Codex handoffs, lessons, and ephemeral session scratch.
-
----
-
 ## Quick reference — what is the source of truth for…?
 
 | Question | Answer |
 |----------|--------|
 | User mUSDC balance | `pallet-assets(1)` on PRMX |
 | Bridge-backed liability counter | `warpAccount.bridgeMintedTotal` on PRMX |
-| Active spec_version | `state_getRuntimeVersion` on the live chain (testnet currently ≥ 510) |
+| Active spec_version | `state_getRuntimeVersion` on the live chain |
 | Active pricing catalog | `obs-openmeteo-14prod-2026-03-12` (Cloud Run API) |
 | Settlement asset | `mUSDC` (MockUSDC ↔ Base via Hyperlane Warp Route) |
 | Policy state machine | `pallet-prmx-policy-v4` |
 | Cross-chain transport | Hyperlane Mailbox + ICA (sole transport) |
-| Governance | Council (3-of-5 multisig); sudo permanently removed in spec 441 |
+| Governance | Council (3-of-5 multisig); the runtime has no sudo |
 
-For invariants and lifecycle rules, see [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS) and the project root `CLAUDE.md`.
+For invariants and lifecycle rules, see [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS).

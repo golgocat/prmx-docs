@@ -1,6 +1,5 @@
 # PRMX V4 App Design (Rainguard UI)
 
-> **Status**: Current (updated 2026-05-01)
 > **Scope**: UX/UI for V4 policy purchase, request lifecycle, and policy monitoring.
 
 This document defines the product UX for PRMX V4 and is aligned with the current frontend routes/components.
@@ -116,8 +115,8 @@ The app uses Next.js App Router.
 | Route | Purpose |
 |-------|---------|
 | `/climate-parametrics` | **Protection Terminal** — unified purchase flow for all 14 products |
-| `/rainguard` | Legacy Rain Guard purchase page (standalone tabs) |
-| `/weather-gate` | Legacy Weather Gate purchase page (standalone tabs) |
+| `/rainguard` | Rain Guard standalone purchase page (product-line scoped tabs) |
+| `/weather-gate` | Weather Gate standalone purchase page (product-line scoped tabs) |
 
 ### Policy and request lifecycle
 
@@ -147,7 +146,7 @@ The app uses Next.js App Router.
 | `/oracle-service` | Oracle service status |
 | `/agents` | AI Agent dashboard (portfolio, activity, per-agent detail) — DAO only |
 | `/admin` | Control Plane (system health, capital, break-glass) — DAO only |
-| `/deposit` | User Route 2 bridge-in flow and Hyperlane delivery status |
+| `/deposit` | User bridge-in flow and Hyperlane delivery status |
 | `/exit` | User canonical PRMX -> Base exit request and release/finalization status |
 | `/history` | Capital and policy lifecycle history with Hyperlane evidence links |
 | `/settings` | Wallet/environment controls |

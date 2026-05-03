@@ -1,6 +1,5 @@
 # PRMX Product Lineup
 
-> **Status**: Current (updated 2026-03-31)
 > **Purpose**: Canonical product-line taxonomy for PRMX V4.
 
 ## Line Architecture
@@ -33,7 +32,7 @@
 ## UX and Routing Strategy
 
 - **Primary purchase route**: `/climate-parametrics` ("Protection Terminal" in sidebar). This unified page exposes all 14 products grouped by product line.
-- **Legacy product routes**: `/rainguard` and `/weather-gate` still exist as standalone purchase pages with their own product-line scoped tabs.
+- **Standalone product routes**: `/rainguard` and `/weather-gate` are standalone purchase pages with their own product-line scoped tabs.
 - **Landing pages**: `/products` hub links to `/products/rain-guard`, `/products/weather-gate`, `/products/climate-parametrics` for marketing/detail pages.
 - Present products grouped by line: Rain Guard first, Weather Gate second, Climate Parametrics third.
 - All 14 active catalog products are purchasable from the app workspace.

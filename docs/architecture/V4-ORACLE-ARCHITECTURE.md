@@ -1,8 +1,6 @@
 # PRMX V4 Oracle Architecture
 
-> **Status**: Current (updated 2026-05-01)
-> **Scope**: Oracle responsibilities in PRMX V4, with special focus on Route 2
-> Hyperlane cross-chain operations.
+> **Scope**: Oracle responsibilities in PRMX V4, including Hyperlane cross-chain operations.
 
 This document is the canonical role description for the V4 oracle system. The
 word "oracle" is used in three related but separate ways in PRMX:
@@ -117,7 +115,7 @@ flowchart LR
 | Vault reporter | Reads Base `PolicyVault.totalAssets()` and reports assets/rebalance acks to PRMX | Treating funding/rebalance as yield |
 | Morpho live NAV probe | Display-only Base RPC `PolicyVault.totalAssets()` readback for UI freshness between canonical reports | Settlement, pricing, DAO underwriting, or mUSDC backing decisions |
 | Rebalancer monitor/decision/executor | Detects drift, builds decisions, dispatches allowed ICA commands | Oracle weather decisions or settlement finality |
-| Warp invariant monitor | Observes Route 2 backing parity and persists alert samples | Halting deposits or changing balances |
+| Warp invariant monitor | Observes Hyperlane backing parity and persists alert samples | Halting deposits or changing balances |
 
 ## Weather Oracle Role
 
@@ -258,10 +256,7 @@ Allowed command families include:
 - testnet yield commands such as strategy accrual;
 - future explicitly allowlisted reserve/yield operations.
 
-Post-cutover Base contracts that use `onlyOperator` should be wired to
-`IcaCommandRouter`, not a direct operator EOA. Direct Base writes are a
-local/dev or pre-cutover fallback only; if ICA is enabled but incomplete, live
-modules should stay dormant.
+Base contracts that use `onlyOperator` are wired to `IcaCommandRouter`, not a direct operator EOA. Direct Base writes are reserved for local/dev only; if ICA is enabled but incomplete, live modules stay dormant.
 
 ### 4. Vault Yield Report Transport
 
@@ -377,8 +372,8 @@ Rules:
   surplus principal/yield back to the shared reserve before the policy is
   closed on PRMX.
 - If `latestVaultAssets` is missing for a vault-backed settlement, the worker
-  fails closed and waits for a fresh pre-settlement vault report. The legacy
-  `requiredLocalLiquidity` fallback is only for true no-vault policies.
+  fails closed and waits for a fresh pre-settlement vault report. The
+  `requiredLocalLiquidity` fallback is reserved for true no-vault policies.
 - PRMX liquidity acknowledgement is clamped to outstanding pending local
   liquidity, so a larger Base reserve return does not become a fresh mint.
 - Base `PolicyVault -> Reserve` is not a user payout.
@@ -454,7 +449,7 @@ Supabase/PostgreSQL stores operational read models:
 | hyperlane_watcher_cursors | Resume points for cross-chain log scans |
 | policy_live_nav | Display-only Morpho live NAV observations from Base RPC |
 | worker_leadership | Split-worker leader election |
-| warp_invariant_samples | Route 2 bridge-net parity monitoring |
+| warp_invariant_samples | Bridge-net parity monitoring |
 
 Important API/readback surfaces:
 
@@ -514,7 +509,7 @@ It must not:
 - mark settlement complete from oracle outcome alone;
 - book yield from initial funding, rebalance, reserve-return, or borrower-driver
   activity;
-- use direct Base operator writes as the live path after ICA cutover;
+- use direct Base operator writes as the live path;
 - hide invariant drift by minting or suppressing losses.
 
 ## Key Environment Groups
@@ -553,12 +548,10 @@ for the specific surface under test:
 
 ## References
 
-- `docs/architecture/V4-ARCHITECTURE.md`
-- `docs/architecture/CAPITAL-INVARIANTS.md`
-- `docs/operations/ORACLE-WORKERS.md`
-- `oracle-service/PRODUCTION.md`
-- `docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision.md`
-- `docs/hyperlane-migration/m75-ica-yield-command-bus.md`
-- `docs/hyperlane-migration/m76-yield-report-hyperlane-transport.md`
-- `docs/hyperlane-migration/m78-prmx-evm-user-actions-design.md`
-- `docs/sbp420/morpho-borrower-safety.md`
+- [V4 Architecture](/docs/architecture/V4-ARCHITECTURE)
+- [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS)
+- [Oracle Workers](/docs/operations/ORACLE-WORKERS)
+- [m72 — pallet-assets canonical path](/docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision)
+- [m75 — ICA + yield command bus](/docs/hyperlane-migration/m75-ica-yield-command-bus)
+- [m76 — yield-report transport](/docs/hyperlane-migration/m76-yield-report-hyperlane-transport)
+- [m78 — PRMX EVM user-actions](/docs/hyperlane-migration/m78-prmx-evm-user-actions-design)

@@ -9,9 +9,9 @@ The oracle service can run in two process modes:
 - **`MODE=workers`**: selected capital domains run as independent processes with
   Supabase-backed leader election.
 
-Current Route 2 operations are Hyperlane-native. `VAULT_REPORTER_TRANSPORT=hyperlane`
-is the live posture; `both` is a rollback / next-generation soak mode after a
-runtime or `YieldReportRecipient` redeploy, not the steady-state target.
+Capital operations are Hyperlane-native. `VAULT_REPORTER_TRANSPORT=hyperlane`
+is the live posture; `both` is a rollback soak mode after a runtime or
+`YieldReportRecipient` redeploy, not the steady-state target.
 Codex automations supplement the service with read-only monitors; they should
 report deltas and first suspected blockers, not mutate live capital state.
 
@@ -25,7 +25,7 @@ For the role-level architecture and cross-chain responsibility boundaries, see
 | Deposit Worker | `deposit` | Reconciles pending wallet links and recent Base -> PRMX Hyperlane deposits into `pallet-assets(1)` | 8081 | 9091 |
 | Exit Worker | `exit` | Releases canonical `warpAccount.request_exit` exits on Base and finalizes them on PRMX | 8082 | 9092 |
 | Settlement Worker | `settlement` | Finalizes PRMX settlements after Base reserve-return evidence is available | 8083 | 9093 |
-| Yield Reporter | `yield-reporter` | Runs vault asset reporting; live Route 2 reports go through Base `YieldReporter` -> Hyperlane -> PRMX `0x0802` | 8085 | 9095 |
+| Yield Reporter | `yield-reporter` | Runs vault asset reporting; reports go through Base `YieldReporter` -> Hyperlane -> PRMX `0x0802` | 8085 | 9095 |
 
 ## Runtime Automation
 
@@ -39,8 +39,8 @@ older worker split is available.
 | Morpho borrower driver | Keeps the testnet Morpho market utilized so vaults can observe borrow interest | `MORPHO_BORROWER_DRIVER_ENABLED`, `MORPHO_BLUE_ADDRESS`, `MORPHO_MARKET_ID`, `MORPHO_BORROWER_*` | `GET /capital/morpho-borrower/status`, `POST /capital/operator/run-morpho-borrower` |
 | Morpho live NAV probe | Display-only Base RPC probe for policy `PolicyVault.totalAssets()` between canonical Hyperlane reports | `MORPHO_LIVE_NAV_PROBE_ENABLED`, `MORPHO_LIVE_NAV_PROBE_INTERVAL_MS`, `MORPHO_LIVE_NAV_PROBE_ROUTE_ID` | `GET /capital/morpho-live-nav-probe/status`, `GET /capital/policies/:policyId/live-nav` |
 | Morpho vault migration | Moves eligible vaults to the Morpho strategy surface during an explicit migration window | `MORPHO_VAULT_MIGRATION_ENABLED`, `MORPHO_BLUE_STRATEGY`, `MORPHO_VAULT_MIGRATION_*` | `GET /capital/morpho-vault-migration/status`, `POST /capital/operator/run-morpho-vault-migration` |
-| Rebalancer monitor / decision / executor | Classifies vaults, builds rebalance decisions, and submits only eligible drift through post-SBP-404 ICA dispatch | `REBALANCER_MONITOR_ENABLED`, `REBALANCER_DECISION_ENABLED`, `REBALANCER_EXECUTOR_ENABLED`, `REBALANCER_MONITOR_FUNDING_BASELINE_TOLERANCE_ATOMIC`, `ICA_DISPATCH_ENABLED`, `PRMX_ICA_*`, `BASE_ICA_*` | Hardened smoke `api-lifecycle-hyperlane`; executor logs must show ICA dispatch on production runs |
-| Warp invariant monitor | Observes Route 2 bridge-net supply vs Base collateral and persists history for alerts | `WARP_INVARIANT_MONITOR_ENABLED`, `WARP_INVARIANT_EVM_RPC_URL`, `WARP_INVARIANT_COLLATERAL_ADDRESS`, `WARP_INVARIANT_USDC_ADDRESS` | `GET /capital/warp-invariant`, `warp_invariant_samples`, `oracle_warp_invariant_*` metrics, Grafana alert |
+| Rebalancer monitor / decision / executor | Classifies vaults, builds rebalance decisions, and submits only eligible drift through ICA dispatch | `REBALANCER_MONITOR_ENABLED`, `REBALANCER_DECISION_ENABLED`, `REBALANCER_EXECUTOR_ENABLED`, `REBALANCER_MONITOR_FUNDING_BASELINE_TOLERANCE_ATOMIC`, `ICA_DISPATCH_ENABLED`, `PRMX_ICA_*`, `BASE_ICA_*` | Hardened smoke `api-lifecycle-hyperlane`; executor logs must show ICA dispatch on production runs |
+| Warp invariant monitor | Observes bridge-net supply vs Base collateral and persists history for alerts | `WARP_INVARIANT_MONITOR_ENABLED`, `WARP_INVARIANT_EVM_RPC_URL`, `WARP_INVARIANT_COLLATERAL_ADDRESS`, `WARP_INVARIANT_USDC_ADDRESS` | `GET /capital/warp-invariant`, `warp_invariant_samples`, `oracle_warp_invariant_*` metrics, Grafana alert |
 
 `POST /capital/operator/*` endpoints require `Authorization: Bearer
 $CAPITAL_OPERATOR_TOKEN`. Keep the token only in the host secret store; never
@@ -77,7 +77,7 @@ docker compose -f docker-compose.workers.yml up -d
 | `HEALTH_PORT` | 8081 | Port for `/healthz` in worker mode |
 | `METRICS_PORT` | 9090 | Port for Prometheus `/metrics` |
 | `CAPITAL_OPERATOR_TOKEN` | unset | Required for operator-triggered capital endpoints |
-| `VAULT_REPORTER_TRANSPORT` | `direct` | Use `hyperlane` in the current live Route 2 generation |
+| `VAULT_REPORTER_TRANSPORT` | `hyperlane` | Yield-report transport. `both` is rollback soak mode only |
 | `VAULT_REPORTER_REBALANCE_ACK_INTERVAL_MS` | 30000 | Scan cadence for Base rebalance ack evidence used by the funding/report guard |
 | `VAULT_REPORTER_REBALANCE_ACK_LOOKBACK_BLOCKS` | 5000 | Bounded Base log lookback for rebalance ack evidence |
 | `MORPHO_LIVE_NAV_PROBE_ENABLED` | false | Enables display-only Base RPC NAV probes into `policy_live_nav`; never a settlement or pricing input |
@@ -143,10 +143,10 @@ Core metrics:
   not a delivery anomaly.
 - Rebalancer production proof should come from the hardened
   `api-lifecycle-hyperlane` gate or targeted executor logs showing ICA dispatch.
-  Direct Base signer fallback is local/dev only after SBP-404 cutover.
-- SBP-437 Route 2 surplus repair is a manual repair script, not a recurring
-  worker. Dry-run it first, execute only during an approved repair window, and
-  follow with `/capital/invariants?routeId=2` plus the hardened lifecycle gate.
+  Direct Base signer fallback is local/dev only.
+- Surplus repair is a manual repair script, not a recurring worker. Dry-run it
+  first, execute only during an approved repair window, and follow with
+  `/capital/invariants` plus the hardened lifecycle gate.
 - In worker mode, multiple workers can still share a signer. Existing retry
   logic handles nonce contention; avoid enabling overlapping ad-hoc operator
   runs during a mutating smoke unless the gate explicitly expects it.

@@ -1,11 +1,10 @@
 # PRMX Rain Guard Product Spec
 
-> **Status**: Current (updated 2026-03-31)
 > **Scope**: Core rainfall line in the PRMX portfolio.
 
 ## Position in Portfolio
 
-PRMX V4 now uses a 3-line structure:
+PRMX V4 uses a 3-line structure:
 
 - **PRMX Rain Guard**: rainfall products (this document)
 - **PRMX Weather Gate**: non-rain weather products
@@ -21,7 +20,7 @@ Canonical taxonomy: `docs/product/PRODUCT-LINEUP.md`.
 | Daily Total | `PrecipSumGte` | `rainfall_7d_24h_total_binary` | Fixed 24h | 20, 30, 40, 50, 75, 100 mm |
 | Hourly Intensity | `Precip1hGte` | `rainfall_7d_1h_max_binary` | Fixed 7 days | 5, 10, 15, 20, 30 mm/h |
 
-Rain Guard products are purchasable from both `/rainguard` (legacy standalone page) and `/climate-parametrics` (unified Protection Terminal).
+Rain Guard products are purchasable from both `/rainguard` (standalone page) and `/climate-parametrics` (unified Protection Terminal).
 
 ## Product Semantics
 

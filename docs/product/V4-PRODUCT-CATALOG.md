@@ -1,6 +1,5 @@
 # PRMX V4 Product Catalog (14 Products)
 
-> **Status**: Current (updated 2026-03-31)
 > **Scope**: Canonical product reference for all products currently active in the V4 pricing catalog.
 
 This document tracks products returned by:
@@ -63,7 +62,7 @@ Interpretation:
 
 ---
 
-## Product specifications (14 active + 3 historical removed)
+## Product specifications
 
 | # | Display name | Product line | Peril ID | Tier | Threshold buckets | Trigger condition | Current activation |
 |---|--------------|--------------|----------|------|-------------------|------------------|-------------------|

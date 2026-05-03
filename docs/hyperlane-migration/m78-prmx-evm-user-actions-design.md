@@ -1,20 +1,13 @@
-# M78 - PRMX EVM User Actions Design
+# M78 — PRMX EVM User Actions Design
 
-**Status**: Implemented and deployed to the DO PRMX testnet on 2026-04-28.
-Runtime spec `503` exposes `0x0808` with linked-account reads, exit, coverage
-request, request cancellation, underwriting, and LP orderbook user actions.
-TypeScript ABI helpers and frontend EVM routes are wired for exit, request
-creation/cancellation, underwriting acceptance, and LP place/buy/cancel actions.
-The live `evm-user-actions` smoke passed against testnet spec `503`.
-
-**Linear**: SBP-419 follow-up.
+The PRMX EVM exposes a write surface at `0x0000000000000000000000000000000000000808` (`PrmxUserActionsPrecompile`) so users can operate PRMX from an Ethereum wallet without moving the source of truth out of the runtime pallets. Linked-account reads, exit, coverage request, request cancellation, underwriting, and LP orderbook user actions are exposed; TypeScript ABI helpers and frontend EVM routes are wired for the same set.
 
 ## Goal
 
 Let users operate PRMX from an Ethereum wallet without moving the source of
 truth out of the runtime pallets.
 
-The current SBP-419 surface at `0x0000000000000000000000000000000000000807`
+The `PrmxViewsPrecompile` at `0x0000000000000000000000000000000000000807`
 solves the read side: Ethereum RPC clients can read policies, requests,
 holdings, and orderbook state. This design adds the write side for user-owned
 actions while keeping capital accounting, policy lifecycle, and settlement
@@ -28,7 +21,7 @@ Add a new PRMX custom precompile:
 
 Name: `PrmxUserActionsPrecompile`.
 
-It is separate from `PrmxViewsPrecompile` so SBP-419 remains read-only and safe
+It is separate from `PrmxViewsPrecompile` so the views surface remains read-only and safe
 for generic RPC/indexing consumers. The new precompile is the only public EVM
 entry point for user actions that mutate PRMX runtime state.
 
@@ -43,21 +36,13 @@ mapping. Instead:
 This makes the wallet-link pallet the identity boundary and avoids silently
 creating a second balance identity for the same person.
 
-## SBP420 Coordination Note
+## Precompile Map
 
-SBP420 should be based on the latest `main` or `codex/sbp-419-main-cleanup`
-state, not an older SBP419 snapshot. The current frontend surfaces for
-exit/history/vault/agents/dashboard and the runtime precompile map include
-SBP419/SBP428 changes.
-
-Pinned current-generation precompile map:
-
+- `0x0000000000000000000000000000000000000800` = `SettlementAsset` (mint)
+- `0x0000000000000000000000000000000000000801` = `WarpAccount` (pending-exit reads)
 - `0x0000000000000000000000000000000000000802` = `YieldReport`
-- `0x0000000000000000000000000000000000000807` = `Views`
-- `0x0000000000000000000000000000000000000808` = `UserActions`
-
-Yield baselines should assume the SBP421 Hyperlane transport path. Do not use
-the older direct reporter baseline when designing or testing SBP420.
+- `0x0000000000000000000000000000000000000807` = `Views` (read-only)
+- `0x0000000000000000000000000000000000000808` = `UserActions` (this design)
 
 ## Non-goals
 
@@ -344,24 +329,17 @@ Runtime/precompile tests:
 - emitted EVM logs are produced for create/accept/place/buy/exit actions.
 - failure inside a downstream pallet rolls back all precompile-side mutations.
 
-Current verification:
+Verification commands:
 
 - `cargo check -p pallet-evm-precompile-prmx-user-actions`
 - `cargo test -p pallet-market-v4 underwrite --lib`
 - `cargo test -p pallet-prmx-orderbook-lp-v4 lp --lib`
 - `SKIP_WASM_BUILD=1 cargo test -p prmx-runtime evm::tests --lib`
 - `npm --prefix frontend run test:run -- prmx-user-actions-precompile prmx-views-precompile`
-  (14 tests)
 - `cd frontend && ./node_modules/.bin/tsc --noEmit`
 - `cargo build --release -p prmx-node`
-- Council runtime upgrade proposal `#13`: spec `502` -> `503`
 - `node scripts/hyperlane-smoke/prmx-views-readback.mjs --manifest=./scripts/hyperlane-smoke/manifest.do.json`
 - `node scripts/hyperlane-smoke/run-smoke.mjs --manifest=./scripts/hyperlane-smoke/manifest.do.json --only=evm-user-actions`
-  passed live on DO testnet. Latest pass created policy
-  `0x7ceb6dd91601d6e29e1abbf5f5788182`, LP order
-  `0x3007c4f128097fac769b6eb89b07839e`, cancelled request
-  `0xd7f9c9d1839a0093d61a03b66789c24b`, and EVM exit request `57`
-  (`requestExit` tx `0x522a47374003ba1b749defbf485b553eec51d1752b9a9cc43cb796313500957a`).
 
 Frontend tests:
 
@@ -383,30 +361,7 @@ Smoke/live tests:
 - full Base release / PRMX finalization remains covered by the existing
   canonical exit and API lifecycle Hyperlane gates
 
-## Rollout order
-
-1. Add pallet helper refactors with no behavior change. Done for
-   `warpAccount.request_exit`, market V4, and LP orderbook V4.
-2. Add `pallet-evm-precompile-prmx-user-actions` and runtime address `0x0808`.
-   Done for read helpers, `requestExit`, coverage requests, underwriting, and
-   LP orderbook actions.
-3. Add Rust tests for identity resolution and each selector. Done for read
-   helpers, linked-account enforcement, `requestExit`, create/cancel request,
-   accept request, place ask, buy LP, and cancel ask.
-4. Add ABI snapshot and TypeScript calldata helpers. Done for all `0x0808`
-   selectors, receipt waits, preflight return-id decoding, and V4 progress
-   wrappers.
-5. Add frontend EVM mode behind runtime capability detection. Done locally for
-   exit, policy creation, request cancellation, underwriting acceptance, and LP
-   place/buy/cancel. Substrate/API submission remains the fallback.
-6. Deploy to testnet, run focused runtime/API tests, then run the optional live
-   EVM-user-actions smoke leg. Done on DO testnet spec `503`.
-7. Make the EVM path the preferred frontend path for users who have a linked EVM
-   wallet connected. Done and deployed to the production Vercel alias.
-
 ## Open decisions
 
-- Whether testnet gas should be funded by automatic link-finalization drip or a
-  manual faucet button.
-- Whether account-link creation itself should later get a PRMX EVM surface, or
-  stay on the current AccountLinkRegistry + PRMX pallet finalize path.
+- Whether testnet gas should be funded by automatic link-finalization drip or a manual faucet button.
+- Whether account-link creation itself should later get a PRMX EVM surface, or stay on the current AccountLinkRegistry + PRMX pallet finalize path.

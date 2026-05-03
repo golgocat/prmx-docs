@@ -2,15 +2,7 @@
 
 This guide explains restart procedures for PRMX local development and PRMX-side cloud services, including what happens at each stage and how secrets are securely managed.
 
-The canonical zero-start runbook for fresh chain bring-up after the
-Hyperlane cutover lives in the source repo at
-`docs/hyperlane-migration/m74-zero-start-runbook-2026-04-21.md` (operator
-runbook, not part of this published reading set).
-Pre-cutover Hyperbridge runbooks were retired on 2026-04-19 and are
-preserved as audit trail under
-`docs/archive/hyperbridge/SHARED-INTEGRATION-RUNBOOK.md`.
-The default shared environment is the DO-hosted PRMX test chain + Base
-Sepolia, not `localhost`.
+The canonical zero-start runbook for fresh chain bring-up lives in the source repo as an operator runbook and is not part of this published reading set. The default shared environment is the DO-hosted PRMX test chain + Base Sepolia, not `localhost`.
 
 Settlement note:
 
@@ -81,7 +73,7 @@ DAO_MNEMONIC="//Alice" \
 ./scripts/restart-dev-environment.sh
 ```
 
-NOTE: The restart script also accepts the legacy env var name `V3_INGEST_HMAC_SECRET` for backward compatibility. This authenticates the V4 OCW with the Oracle Service via HMAC. Open-Meteo requires no API key.
+NOTE: `INGEST_HMAC_SECRET` authenticates the V4 OCW with the Oracle Service via HMAC. Open-Meteo requires no API key.
 
 ---
 
@@ -96,7 +88,7 @@ The V4 OCW requires secrets stored in offchain worker persistent storage:
 | HMAC Secret | `ocw:v4:ingest_hmac_secret` | Authenticating with the Ingest API |
 | Ingest URL | `ocw:v4:ingest_api_url` | URL of the off-chain oracle service |
 
-NOTE: Storage keys use `ocw:v4:` prefix (bumped from `ocw:v3:` in spec 413 to invalidate stale OCW state after AggStateV4 codec drift fix).
+NOTE: OCW storage keys use the `ocw:v4:` prefix.
 
 ### After Restart
 
@@ -420,7 +412,6 @@ const { ApiPromise, WsProvider } = require('@polkadot/api');
 "
 ```
 
-NOTE: If your `.env` uses the legacy `V3_INGEST_HMAC_SECRET` name, that still works — both names are accepted.
 
 ### No Local Oracle Accounts
 
@@ -479,7 +470,7 @@ sudo certbot renew --force-renewal  # Renew SSL
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `INGEST_HMAC_SECRET` | Yes | -- | HMAC auth for OCW ingest (`V3_INGEST_HMAC_SECRET` also accepted) |
+| `INGEST_HMAC_SECRET` | Yes | -- | HMAC auth for OCW ingest |
 | `SUPABASE_URL` | Yes | -- | Supabase instance URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | -- | Supabase admin key |
 | `WS_URL` | Yes | ws://localhost:9944 | Chain WebSocket |
@@ -513,17 +504,3 @@ sudo certbot renew --force-renewal  # Renew SSL
 | `PRICING_API_KEY` | No | -- | Pricing API key |
 | `NEXT_PUBLIC_ORACLE_SERVICE_URL` | No | -- | Oracle service base URL |
 
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 4.3 | Mar 2026 | Updated OCW storage prefix to `ocw:v4:`, env var to `INGEST_HMAC_SECRET`, added cross-chain relayer restart to forkless upgrade procedure, DAO event types updated to 14 products, `oracle-service/` path (renamed from `offchain-oracle-service/`) |
-| 4.2 | Feb 2026 | Added forkless upgrade safety rules and clarified oracle-driven runtime table clears |
-| 4.1 | Feb 2026 | Updated restart script: removed AccuWeather/MongoDB/legacy pricing dependencies |
-| 4.0 | Feb 2026 | V4 Rainguard: Supabase-only, Open-Meteo, Pricing API, 40 cities, dual products |
-| 3.1 | Feb 2026 | Added --ingest-url, Pricing API pricing support |
-| 3.0 | Jan 2026 | V3-only (removed V1/V2) |
-| 2.0 | Jan 2026 | DAO auto-underwrite, post-restart setup |
-| 1.0 | Jan 2026 | Initial restart guide |
