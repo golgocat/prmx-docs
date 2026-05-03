@@ -105,7 +105,7 @@ Current live state on 2026-04-24 is narrower:
    replace the oracle-service visible dispatcher sidecar with a permanent
    relayer-visible PRMX EVM dispatch surface so pallet outbound exits dispatch
    through Hyperlane without transport substitution.
-   Concrete subdesign is fixed in [m73-exit-dispatcher-design.md](/Users/satorubito/Codes/PRMX/docs/hyperlane-migration/m73-exit-dispatcher-design.md).
+   Concrete subdesign is fixed in [m73 — Exit Dispatcher design](/docs/hyperlane-migration/m73-exit-dispatcher-design).
 3. Remove temporary paths:
    keep `hyperlane-deposit-attest-worker` in observe mode only until DB
    lifecycle consumers are migrated, and stop using direct PRMX EVM

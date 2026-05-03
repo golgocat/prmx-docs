@@ -31,7 +31,7 @@ Mapping between rulebook terms and the current V4 Rainguard implementation:
 |---|---|---|---|
 | Policy | PolicyV4 (on-chain) | Insurance contract. Contains coverage period, covered peril, threshold, payout terms, premium, and max payout | ✅ |
 | Exposure | LocationId + EventSpec | Unit of risk. Defined as 40 cities x 14 event types | ✅ |
-| Event | EventSpec (EventTypeV4 + threshold) | Observable natural phenomenon. 14 active event types (see docs/product/V4-PRODUCT-CATALOG.md) | ✅ |
+| Event | EventSpec (EventTypeV4 + threshold) | Observable natural phenomenon. 14 active event types (see [V4 Product Catalog](/docs/product/V4-PRODUCT-CATALOG)) | ✅ |
 | Observation | WeatherObservation | Hourly weather data point. epoch_time, precip_1h_mm_x1000, temp_c_x1000, wind_gust_mps_x1000 | ✅ |
 | Trigger | PolicyTriggered (on-chain event) | Final settlement outcome after threshold is exceeded and liquidity is ready. Oracle detection may precede final settlement. | 🔧 |
 | Claim | (not applicable) | Parametric insurance uses automatic determination. No manual claim filing | ✅ (by design) |

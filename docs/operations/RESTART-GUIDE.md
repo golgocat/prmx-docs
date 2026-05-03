@@ -3,11 +3,12 @@
 This guide explains restart procedures for PRMX local development and PRMX-side cloud services, including what happens at each stage and how secrets are securely managed.
 
 The canonical zero-start runbook for fresh chain bring-up after the
-Hyperlane cutover lives at
-[docs/hyperlane-migration/m74-zero-start-runbook-2026-04-21.md](../hyperlane-migration/m74-zero-start-runbook-2026-04-21.md).
+Hyperlane cutover lives in the source repo at
+`docs/hyperlane-migration/m74-zero-start-runbook-2026-04-21.md` (operator
+runbook, not part of this published reading set).
 Pre-cutover Hyperbridge runbooks were retired on 2026-04-19 and are
 preserved as audit trail under
-[docs/archive/hyperbridge/SHARED-INTEGRATION-RUNBOOK.md](../archive/hyperbridge/SHARED-INTEGRATION-RUNBOOK.md).
+`docs/archive/hyperbridge/SHARED-INTEGRATION-RUNBOOK.md`.
 The default shared environment is the DO-hosted PRMX test chain + Base
 Sepolia, not `localhost`.
 

@@ -64,7 +64,7 @@
 > remains the rollback / next-generation soak mode after future redeploys. Base
 > reserve, rebalance, and strategy operations are executed through Hyperlane ICA;
 > direct Base writes to operational targets are cutover violations. See
-> [m76-yield-report-hyperlane-transport.md](/Users/satorubito/Codes/PRMX/docs/hyperlane-migration/m76-yield-report-hyperlane-transport.md).
+> [m76 — Yield Report Hyperlane Transport](/docs/hyperlane-migration/m76-yield-report-hyperlane-transport).
 
 ## Tier 2: B ~= EVM_total (1:1 Backing Invariant)
 
@@ -72,7 +72,7 @@
 the configured tolerance. Every bridged mUSDC must be backed, and material
 surplus backing is also drift that needs reconciliation.
 
-- **Enforcement target**: a single authorized minting path — Hyperlane Warp Route ending in `pallet-assets(1)` via the PRMX EVM recipient/facade/precompile path. See [m72-pallet-assets-hyperlane-canonical-path-decision.md](/Users/satorubito/Codes/PRMX/docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision.md).
+- **Enforcement target**: a single authorized minting path — Hyperlane Warp Route ending in `pallet-assets(1)` via the PRMX EVM recipient/facade/precompile path. See [m72 — pallet-assets canonical path decision](/docs/hyperlane-migration/m72-pallet-assets-hyperlane-canonical-path-decision).
 - **Runtime guard**: `frame_system::Config::BaseCallFilter` blocks native
   `pallet-assets` create/mint/burn/team/status/destroy calls for
   `SETTLEMENT_ASSET_ID = 1`. External users, operators, and governance
