@@ -3,12 +3,6 @@
 > **Status**: Current (updated 2026-05-01)
 > **Scope**: End-to-end V4 system architecture (runtime, OCW, oracle service, pricing, frontend).
 
-> **Product-line decision (2026-04-26)**: this architecture is now the basis
-> for `PRMX-v4-defi`, the Fully Decentralized DeFi Version. The regulated
-> Bermuda SAC design is a separate V5 product line and repository
-> (`PRMX-v5-regulated`); do not retrofit SAC-bound position/claim accounting
-> into V4. See `docs/architecture/PRMX-V4-V5-PRODUCT-SPLIT.md`.
-
 PRMX V4 is a Substrate-based parametric weather insurance system with a Rainguard-first UX and a multi-peril pricing catalog.
 
 Settlement model note:
@@ -459,7 +453,6 @@ Vault yield tracking ensures PRMX `pallet-assets(1)` accounting follows Base Pol
 - Capital invariants & SSoT rules: `docs/architecture/CAPITAL-INVARIANTS.md`
 - Oracle architecture: `docs/architecture/V4-ORACLE-ARCHITECTURE.md`
 - Parametric rules: `docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK.md`
-- V4 vs V5 product-line split: `docs/architecture/PRMX-V4-V5-PRODUCT-SPLIT.md`
 - DeFi operational patterns: `docs/architecture/DEFI-OPERATIONAL-PATTERNS.md`
 
 ### Product

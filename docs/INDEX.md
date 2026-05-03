@@ -20,7 +20,6 @@ Read in this order to get end-to-end coverage:
 | 2 | [V4 Oracle Architecture](/docs/architecture/V4-ORACLE-ARCHITECTURE) | Oracle responsibilities: weather observation ingest, snapshot finalization, and the Route 2 capital / vault / rebalancer / yield-reporter workers run by the oracle service. |
 | 3 | [Capital Invariants](/docs/architecture/CAPITAL-INVARIANTS) | The two non-negotiable rules: 1:1 USDC↔mUSDC backing, and `pallet-assets(1)` as the single source of truth for all PRMX balances. Reading this before touching capital code prevents the most damaging class of bug. |
 | 4 | [Parametric Insurance Rulebook](/docs/architecture/PARAMETRIC-INSURANCE-RULEBOOK) | How parametric insurance is modeled in V4: peril taxonomy, threshold semantics, settlement decision rules, dispute windows. |
-| 5 | [PRMX V4 / V5 Product Split](/docs/architecture/PRMX-V4-V5-PRODUCT-SPLIT) | The product-line split: V4 is the DeFi version (this repo); V5 is a separate regulated Bermuda SAC product line. Read so you do not retrofit V5 concerns into V4 code. |
 
 After section 1 you should be able to answer: *what does PRMX do, who keeps balances honest, and how does it decide whether a policy paid out?*
 
